@@ -3,15 +3,23 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 import json
-from .. import models, database, schemas
+from .. import database
+from ..models import Room, Hotel
+from ..schemas import (
+    Room as RoomSchema,
+    RoomCreate,
+    RoomUpdate,
+    Hotel as HotelSchema,
+)
+from ..schemas.relationships import RoomWithHotel
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
 
 
-@router.get("/", response_model=List[schemas.Room])
+@router.get("/", response_model=List[RoomSchema])
 def get_rooms(db: Session = Depends(database.get_db)):
     """Get all rooms"""
-    rooms = db.query(models.Room).all()
+    rooms = db.query(Room).all()
 
     # Convert images and amenities JSON string to list for each room
     for room in rooms:
@@ -23,7 +31,7 @@ def get_rooms(db: Session = Depends(database.get_db)):
     return rooms
 
 
-@router.get("/by-hotel/{hotel_id}", response_model=List[schemas.Room])
+@router.get("/by-hotel/{hotel_id}", response_model=List[RoomSchema])
 def get_rooms_by_hotel(hotel_id: str, db: Session = Depends(database.get_db)):
     """Get all rooms for a specific hotel"""
     try:
@@ -35,12 +43,12 @@ def get_rooms_by_hotel(hotel_id: str, db: Session = Depends(database.get_db)):
         )
 
     # Check if hotel exists
-    hotel = db.query(models.Hotel).filter(models.Hotel.id == hotel_uuid).first()
+    hotel = db.query(Hotel).filter(Hotel.id == hotel_uuid).first()
     if hotel is None:
         raise HTTPException(status_code=404, detail="Hotel not found")
 
     # Get all rooms for this hotel
-    rooms = db.query(models.Room).filter(models.Room.hotel_id == hotel_uuid).all()
+    rooms = db.query(Room).filter(Room.hotel_id == hotel_uuid).all()
 
     # Convert images and amenities JSON string to list for each room
     for room in rooms:
@@ -52,7 +60,7 @@ def get_rooms_by_hotel(hotel_id: str, db: Session = Depends(database.get_db)):
     return rooms
 
 
-@router.get("/{room_id}", response_model=schemas.Room)
+@router.get("/{room_id}", response_model=RoomSchema)
 def get_room(room_id: str, db: Session = Depends(database.get_db)):
     """Get a specific room by ID"""
     try:
@@ -63,7 +71,7 @@ def get_room(room_id: str, db: Session = Depends(database.get_db)):
             status_code=400, detail="Invalid room ID format. Must be a valid UUID."
         )
 
-    room = db.query(models.Room).filter(models.Room.id == room_uuid).first()
+    room = db.query(Room).filter(Room.id == room_uuid).first()
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
 
@@ -76,7 +84,7 @@ def get_room(room_id: str, db: Session = Depends(database.get_db)):
     return room
 
 
-@router.get("/{room_id}/with-hotel", response_model=schemas.RoomWithHotel)
+@router.get("/{room_id}/with-hotel", response_model=RoomWithHotel)
 def get_room_with_hotel(room_id: str, db: Session = Depends(database.get_db)):
     """Get a room with its hotel information"""
     try:
@@ -87,7 +95,7 @@ def get_room_with_hotel(room_id: str, db: Session = Depends(database.get_db)):
             status_code=400, detail="Invalid room ID format. Must be a valid UUID."
         )
 
-    room = db.query(models.Room).filter(models.Room.id == room_uuid).first()
+    room = db.query(Room).filter(Room.id == room_uuid).first()
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
 
@@ -98,7 +106,7 @@ def get_room_with_hotel(room_id: str, db: Session = Depends(database.get_db)):
         room.amenities = room.amenities_list
 
     # Get hotel information
-    hotel = db.query(models.Hotel).filter(models.Hotel.id == room.hotel_id).first()
+    hotel = db.query(Hotel).filter(Hotel.id == room.hotel_id).first()
     if hotel:
         # Convert hotel images JSON string to list for API response
         if hasattr(hotel, "images_list"):
@@ -109,7 +117,7 @@ def get_room_with_hotel(room_id: str, db: Session = Depends(database.get_db)):
     return room
 
 
-@router.post("/", response_model=schemas.Room)
+@router.post("/", response_model=RoomSchema)
 def create_room(room_data: dict, db: Session = Depends(database.get_db)):
     """Create a new room"""
     try:
@@ -121,7 +129,7 @@ def create_room(room_data: dict, db: Session = Depends(database.get_db)):
         )
 
     # Check if hotel exists
-    hotel = db.query(models.Hotel).filter(models.Hotel.id == hotel_uuid).first()
+    hotel = db.query(Hotel).filter(Hotel.id == hotel_uuid).first()
     if hotel is None:
         raise HTTPException(status_code=404, detail="Hotel not found")
 
@@ -135,7 +143,7 @@ def create_room(room_data: dict, db: Session = Depends(database.get_db)):
     if room_data.get("amenities"):
         amenities_json = json.dumps(room_data["amenities"])
 
-    db_room = models.Room(
+    db_room = Room(
         hotel_id=hotel_uuid,
         name=room_data["name"],
         description=room_data.get("description"),
@@ -156,10 +164,10 @@ def create_room(room_data: dict, db: Session = Depends(database.get_db)):
     return db_room
 
 
-@router.put("/{room_id}", response_model=schemas.Room)
+@router.put("/{room_id}", response_model=RoomSchema)
 def update_room(
     room_id: str,
-    room_update: schemas.RoomUpdate,
+    room_update: RoomUpdate,
     db: Session = Depends(database.get_db),
 ):
     """Update a room completely"""
@@ -172,7 +180,7 @@ def update_room(
         )
 
     # Check if room exists
-    db_room = db.query(models.Room).filter(models.Room.id == room_uuid).first()
+    db_room = db.query(Room).filter(Room.id == room_uuid).first()
     if db_room is None:
         raise HTTPException(status_code=404, detail="Room not found")
 

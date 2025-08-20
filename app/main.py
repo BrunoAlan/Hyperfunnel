@@ -1,10 +1,13 @@
 from fastapi import FastAPI
-from . import models, database
-from .database import engine
+from . import database
+from .database import engine, Base
 from .routers import hotels, rooms, availability
 
+# Import models to register them with SQLAlchemy
+from .models import Hotel, Room, Availability  # noqa: F401
+
 # Create tables
-models.Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 

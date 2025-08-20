@@ -2,14 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-from .. import models, database, schemas
+from .. import database
+from ..models import Hotel, Room
+from ..schemas import Hotel as HotelSchema, HotelCreate, HotelUpdate
+from ..schemas.relationships import HotelWithRooms
 
 router = APIRouter(prefix="/hotels", tags=["hotels"])
 
 
-@router.get("/", response_model=List[schemas.Hotel])
+@router.get("/", response_model=List[HotelSchema])
 def get_hotels(db: Session = Depends(database.get_db)):
-    hotels = db.query(models.Hotel).all()
+    hotels = db.query(Hotel).all()
     # Convert each hotel to use the images_list property
     for hotel in hotels:
         if hasattr(hotel, "images_list"):
@@ -17,7 +20,7 @@ def get_hotels(db: Session = Depends(database.get_db)):
     return hotels
 
 
-@router.get("/{hotel_id}", response_model=schemas.Hotel)
+@router.get("/{hotel_id}", response_model=HotelSchema)
 def get_hotel(hotel_id: str, db: Session = Depends(database.get_db)):
     try:
         # Validate that hotel_id is a valid UUID
@@ -27,7 +30,7 @@ def get_hotel(hotel_id: str, db: Session = Depends(database.get_db)):
             status_code=400, detail="Invalid hotel ID format. Must be a valid UUID."
         )
 
-    hotel = db.query(models.Hotel).filter(models.Hotel.id == hotel_uuid).first()
+    hotel = db.query(Hotel).filter(Hotel.id == hotel_uuid).first()
     if hotel is None:
         raise HTTPException(status_code=404, detail="Hotel not found")
 
@@ -38,7 +41,7 @@ def get_hotel(hotel_id: str, db: Session = Depends(database.get_db)):
     return hotel
 
 
-@router.get("/{hotel_id}/with-rooms", response_model=schemas.HotelWithRooms)
+@router.get("/{hotel_id}/with-rooms", response_model=HotelWithRooms)
 def get_hotel_with_rooms(hotel_id: str, db: Session = Depends(database.get_db)):
     try:
         # Validate that hotel_id is a valid UUID
@@ -48,7 +51,7 @@ def get_hotel_with_rooms(hotel_id: str, db: Session = Depends(database.get_db)):
             status_code=400, detail="Invalid hotel ID format. Must be a valid UUID."
         )
 
-    hotel = db.query(models.Hotel).filter(models.Hotel.id == hotel_uuid).first()
+    hotel = db.query(Hotel).filter(Hotel.id == hotel_uuid).first()
     if hotel is None:
         raise HTTPException(status_code=404, detail="Hotel not found")
 
@@ -57,7 +60,7 @@ def get_hotel_with_rooms(hotel_id: str, db: Session = Depends(database.get_db)):
         hotel.images = hotel.images_list
 
     # Get all rooms for this hotel
-    rooms = db.query(models.Room).filter(models.Room.hotel_id == hotel_uuid).all()
+    rooms = db.query(Room).filter(Room.hotel_id == hotel_uuid).all()
 
     # Convert images and amenities JSON string to list for each room
     for room in rooms:
@@ -72,8 +75,8 @@ def get_hotel_with_rooms(hotel_id: str, db: Session = Depends(database.get_db)):
     return hotel
 
 
-@router.post("/", response_model=schemas.Hotel)
-def create_hotel(hotel: schemas.HotelCreate, db: Session = Depends(database.get_db)):
+@router.post("/", response_model=HotelSchema)
+def create_hotel(hotel: HotelCreate, db: Session = Depends(database.get_db)):
     # Convert images list to JSON string for storage
     images_json = None
     if hotel.images:
@@ -81,7 +84,7 @@ def create_hotel(hotel: schemas.HotelCreate, db: Session = Depends(database.get_
 
         images_json = json.dumps(hotel.images)
 
-    db_hotel = models.Hotel(
+    db_hotel = Hotel(
         name=hotel.name,
         country=hotel.country,
         city=hotel.city,
@@ -99,9 +102,9 @@ def create_hotel(hotel: schemas.HotelCreate, db: Session = Depends(database.get_
     return db_hotel
 
 
-@router.put("/{hotel_id}", response_model=schemas.Hotel)
+@router.put("/{hotel_id}", response_model=HotelSchema)
 def update_hotel(
-    hotel_id: str, hotel: schemas.HotelCreate, db: Session = Depends(database.get_db)
+    hotel_id: str, hotel: HotelCreate, db: Session = Depends(database.get_db)
 ):
     try:
         # Validate that hotel_id is a valid UUID
@@ -111,7 +114,7 @@ def update_hotel(
             status_code=400, detail="Invalid hotel ID format. Must be a valid UUID."
         )
 
-    db_hotel = db.query(models.Hotel).filter(models.Hotel.id == hotel_uuid).first()
+    db_hotel = db.query(Hotel).filter(Hotel.id == hotel_uuid).first()
     if db_hotel is None:
         raise HTTPException(status_code=404, detail="Hotel not found")
 
@@ -139,9 +142,9 @@ def update_hotel(
     return db_hotel
 
 
-@router.patch("/{hotel_id}", response_model=schemas.Hotel)
+@router.patch("/{hotel_id}", response_model=HotelSchema)
 def partial_update_hotel(
-    hotel_id: str, hotel: schemas.HotelUpdate, db: Session = Depends(database.get_db)
+    hotel_id: str, hotel: HotelUpdate, db: Session = Depends(database.get_db)
 ):
     try:
         # Validate that hotel_id is a valid UUID
@@ -151,7 +154,7 @@ def partial_update_hotel(
             status_code=400, detail="Invalid hotel ID format. Must be a valid UUID."
         )
 
-    db_hotel = db.query(models.Hotel).filter(models.Hotel.id == hotel_uuid).first()
+    db_hotel = db.query(Hotel).filter(Hotel.id == hotel_uuid).first()
     if db_hotel is None:
         raise HTTPException(status_code=404, detail="Hotel not found")
 

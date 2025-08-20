@@ -4,12 +4,21 @@ from sqlalchemy import and_, or_
 from typing import List, Optional
 from uuid import UUID
 from datetime import date, timedelta
-from .. import models, database, schemas
+from .. import database
+from ..models import Availability, Room
+from ..schemas import (
+    Availability as AvailabilitySchema,
+    AvailabilityCreate,
+    AvailabilityUpdate,
+    AvailabilityWithRoom,
+    AvailabilityRange,
+    AvailabilitySearch,
+)
 
 router = APIRouter(prefix="/availability", tags=["availability"])
 
 
-@router.get("/", response_model=List[schemas.Availability])
+@router.get("/", response_model=List[AvailabilitySchema])
 def get_availability(
     room_id: Optional[UUID] = Query(None, description="Filter by room ID"),
     start_date: Optional[date] = Query(None, description="Start date for range"),
@@ -18,29 +27,29 @@ def get_availability(
     db: Session = Depends(database.get_db),
 ):
     """Get availability records with optional filters"""
-    query = db.query(models.Availability)
+    query = db.query(Availability)
 
     if room_id:
-        query = query.filter(models.Availability.room_id == room_id)
+        query = query.filter(Availability.room_id == room_id)
 
     if start_date:
-        query = query.filter(models.Availability.date >= start_date)
+        query = query.filter(Availability.date >= start_date)
 
     if end_date:
-        query = query.filter(models.Availability.date <= end_date)
+        query = query.filter(Availability.date <= end_date)
 
     if available_only:
         query = query.filter(
             and_(
-                models.Availability.available_rooms > 0,
-                models.Availability.is_blocked == False,
+                Availability.available_rooms > 0,
+                Availability.is_blocked == False,
             )
         )
 
-    return query.order_by(models.Availability.date).all()
+    return query.order_by(Availability.date).all()
 
 
-@router.get("/{availability_id}", response_model=schemas.Availability)
+@router.get("/{availability_id}", response_model=AvailabilitySchema)
 def get_availability_by_id(
     availability_id: str, db: Session = Depends(database.get_db)
 ):
@@ -54,9 +63,7 @@ def get_availability_by_id(
         )
 
     availability = (
-        db.query(models.Availability)
-        .filter(models.Availability.id == availability_uuid)
-        .first()
+        db.query(Availability).filter(Availability.id == availability_uuid).first()
     )
 
     if availability is None:
@@ -65,23 +72,23 @@ def get_availability_by_id(
     return availability
 
 
-@router.post("/", response_model=schemas.Availability)
+@router.post("/", response_model=AvailabilitySchema)
 def create_availability(
-    availability: schemas.AvailabilityCreate, db: Session = Depends(database.get_db)
+    availability: AvailabilityCreate, db: Session = Depends(database.get_db)
 ):
     """Create a single availability record"""
     # Verify that the room exists
-    room = db.query(models.Room).filter(models.Room.id == availability.room_id).first()
+    room = db.query(Room).filter(Room.id == availability.room_id).first()
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
 
     # Check if availability already exists for this room and date
     existing = (
-        db.query(models.Availability)
+        db.query(Availability)
         .filter(
             and_(
-                models.Availability.room_id == availability.room_id,
-                models.Availability.date == availability.date,
+                Availability.room_id == availability.room_id,
+                Availability.date == availability.date,
             )
         )
         .first()
@@ -93,7 +100,7 @@ def create_availability(
             detail=f"Availability already exists for room {availability.room_id} on {availability.date}",
         )
 
-    db_availability = models.Availability(**availability.model_dump())
+    db_availability = Availability(**availability.model_dump())
     db.add(db_availability)
     db.commit()
     db.refresh(db_availability)
@@ -101,18 +108,14 @@ def create_availability(
     return db_availability
 
 
-@router.post("/range", response_model=List[schemas.Availability])
+@router.post("/range", response_model=List[AvailabilitySchema])
 def create_availability_range(
-    availability_range: schemas.AvailabilityRange,
+    availability_range: AvailabilityRange,
     db: Session = Depends(database.get_db),
 ):
     """Create availability records for a date range"""
     # Verify that the room exists
-    room = (
-        db.query(models.Room)
-        .filter(models.Room.id == availability_range.room_id)
-        .first()
-    )
+    room = db.query(Room).filter(Room.id == availability_range.room_id).first()
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
 
@@ -127,18 +130,18 @@ def create_availability_range(
     while current_date <= availability_range.end_date:
         # Check if availability already exists for this room and date
         existing = (
-            db.query(models.Availability)
+            db.query(Availability)
             .filter(
                 and_(
-                    models.Availability.room_id == availability_range.room_id,
-                    models.Availability.date == current_date,
+                    Availability.room_id == availability_range.room_id,
+                    Availability.date == current_date,
                 )
             )
             .first()
         )
 
         if not existing:
-            db_availability = models.Availability(
+            db_availability = Availability(
                 room_id=availability_range.room_id,
                 date=current_date,
                 total_rooms=availability_range.total_rooms,
@@ -160,10 +163,10 @@ def create_availability_range(
     return created_records
 
 
-@router.put("/{availability_id}", response_model=schemas.Availability)
+@router.put("/{availability_id}", response_model=AvailabilitySchema)
 def update_availability(
     availability_id: str,
-    availability_update: schemas.AvailabilityUpdate,
+    availability_update: AvailabilityUpdate,
     db: Session = Depends(database.get_db),
 ):
     """Update an availability record"""
@@ -176,9 +179,7 @@ def update_availability(
         )
 
     db_availability = (
-        db.query(models.Availability)
-        .filter(models.Availability.id == availability_uuid)
-        .first()
+        db.query(Availability).filter(Availability.id == availability_uuid).first()
     )
 
     if db_availability is None:
@@ -207,9 +208,7 @@ def delete_availability(availability_id: str, db: Session = Depends(database.get
         )
 
     db_availability = (
-        db.query(models.Availability)
-        .filter(models.Availability.id == availability_uuid)
-        .first()
+        db.query(Availability).filter(Availability.id == availability_uuid).first()
     )
 
     if db_availability is None:
@@ -221,43 +220,41 @@ def delete_availability(availability_id: str, db: Session = Depends(database.get
     return {"message": "Availability record deleted successfully"}
 
 
-@router.post("/search", response_model=List[schemas.AvailabilityWithRoom])
+@router.post("/search", response_model=List[AvailabilityWithRoom])
 def search_availability(
-    search_params: schemas.AvailabilitySearch, db: Session = Depends(database.get_db)
+    search_params: AvailabilitySearch, db: Session = Depends(database.get_db)
 ):
     """Search for available rooms based on criteria"""
-    query = db.query(models.Availability).join(models.Room)
+    query = db.query(Availability).join(Room)
 
     # Filter by date range
     query = query.filter(
         and_(
-            models.Availability.date >= search_params.start_date,
-            models.Availability.date <= search_params.end_date,
+            Availability.date >= search_params.start_date,
+            Availability.date <= search_params.end_date,
         )
     )
 
     # Filter by minimum available rooms
-    query = query.filter(models.Availability.available_rooms >= search_params.min_rooms)
+    query = query.filter(Availability.available_rooms >= search_params.min_rooms)
 
     # Filter by not blocked
-    query = query.filter(models.Availability.is_blocked == False)
+    query = query.filter(Availability.is_blocked == False)
 
     # Filter by hotel if provided
     if search_params.hotel_id:
-        query = query.filter(models.Room.hotel_id == search_params.hotel_id)
+        query = query.filter(Room.hotel_id == search_params.hotel_id)
 
     # Filter by room if provided
     if search_params.room_id:
-        query = query.filter(models.Availability.room_id == search_params.room_id)
+        query = query.filter(Availability.room_id == search_params.room_id)
 
-    availability_records = query.order_by(
-        models.Availability.date, models.Room.name
-    ).all()
+    availability_records = query.order_by(Availability.date, Room.name).all()
 
     return availability_records
 
 
-@router.get("/room/{room_id}/calendar", response_model=List[schemas.Availability])
+@router.get("/room/{room_id}/calendar", response_model=List[AvailabilitySchema])
 def get_room_calendar(
     room_id: str,
     start_date: date = Query(..., description="Start date for calendar"),
@@ -273,7 +270,7 @@ def get_room_calendar(
         )
 
     # Verify that the room exists
-    room = db.query(models.Room).filter(models.Room.id == room_uuid).first()
+    room = db.query(Room).filter(Room.id == room_uuid).first()
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
 
@@ -283,15 +280,15 @@ def get_room_calendar(
         )
 
     availability_records = (
-        db.query(models.Availability)
+        db.query(Availability)
         .filter(
             and_(
-                models.Availability.room_id == room_uuid,
-                models.Availability.date >= start_date,
-                models.Availability.date <= end_date,
+                Availability.room_id == room_uuid,
+                Availability.date >= start_date,
+                Availability.date <= end_date,
             )
         )
-        .order_by(models.Availability.date)
+        .order_by(Availability.date)
         .all()
     )
 
@@ -314,7 +311,7 @@ def block_dates(
         )
 
     # Verify that the room exists
-    room = db.query(models.Room).filter(models.Room.id == room_uuid).first()
+    room = db.query(Room).filter(Room.id == room_uuid).first()
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
 
@@ -330,11 +327,11 @@ def block_dates(
 
     while current_date <= end_date:
         existing = (
-            db.query(models.Availability)
+            db.query(Availability)
             .filter(
                 and_(
-                    models.Availability.room_id == room_uuid,
-                    models.Availability.date == current_date,
+                    Availability.room_id == room_uuid,
+                    Availability.date == current_date,
                 )
             )
             .first()
@@ -344,7 +341,7 @@ def block_dates(
             existing.is_blocked = True
             updated_count += 1
         else:
-            db_availability = models.Availability(
+            db_availability = Availability(
                 room_id=room_uuid,
                 date=current_date,
                 total_rooms=5,
