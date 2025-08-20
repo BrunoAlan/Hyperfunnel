@@ -303,3 +303,5 @@ settings.local.py
 
 # UV specific
 .uv/
+
+hyperfunnel_seed_*.json
