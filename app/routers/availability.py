@@ -251,7 +251,35 @@ def search_availability(
 
     availability_records = query.order_by(Availability.date, Room.name).all()
 
-    return availability_records
+    # Convert the records to properly format the room data
+    result = []
+    for record in availability_records:
+        # Convert the record to dict and manually handle room conversion
+        record_dict = {
+            "id": record.id,
+            "room_id": record.room_id,
+            "date": record.date,
+            "total_rooms": record.total_rooms,
+            "available_rooms": record.available_rooms,
+            "price_override": record.price_override,
+            "is_blocked": record.is_blocked,
+            "created_at": record.created_at,
+            "updated_at": record.updated_at,
+            "room": {
+                "id": record.room.id,
+                "hotel_id": record.room.hotel_id,
+                "name": record.room.name,
+                "description": record.room.description,
+                "price": record.room.price,
+                "images": record.room.images_list,  # Use the property that converts JSON to list
+                "amenities": record.room.amenities_list,  # Use the property that converts JSON to list
+                "created_at": record.room.created_at,
+                "updated_at": record.room.updated_at,
+            },
+        }
+        result.append(AvailabilityWithRoom.model_validate(record_dict))
+
+    return result
 
 
 @router.get("/room/{room_id}/calendar", response_model=List[AvailabilitySchema])

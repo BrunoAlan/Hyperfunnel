@@ -1,5 +1,5 @@
 import json
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
@@ -49,30 +49,36 @@ class Room(RoomBase):
 
     model_config = {"from_attributes": True}
 
+    @field_validator("images", mode="before")
     @classmethod
-    def model_validate(cls, obj):
-        # Convert images JSON string to list for API response
-        if hasattr(obj, "images_list"):
-            obj.images = obj.images_list
-        # Convert amenities JSON string to list for API response
-        if hasattr(obj, "amenities_list"):
-            obj.amenities = obj.amenities_list
-        return super().model_validate(obj)
-
-    @property
-    def amenities_list(self) -> Optional[List[str]]:
-        """Convert amenities JSON string to list"""
-        if self.amenities:
+    def validate_images(cls, v, info):
+        # If the source object has images_list property, use it
+        if hasattr(info.context, "images_list") if info.context else False:
+            return info.context.images_list
+        # If it's a SQLAlchemy object with images_list property
+        elif hasattr(v, "images_list"):
+            return v.images_list
+        # If it's a JSON string, parse it
+        elif isinstance(v, str) and v:
             try:
-                return json.loads(self.amenities)
+                return json.loads(v)
             except (json.JSONDecodeError, TypeError):
                 return None
-        return None
+        return v
 
-    @amenities_list.setter
-    def amenities_list(self, value: Optional[List[str]]):
-        """Convert amenities list to JSON string"""
-        if value is not None:
-            self.amenities = json.dumps(value)
-        else:
-            self.amenities = None
+    @field_validator("amenities", mode="before")
+    @classmethod
+    def validate_amenities(cls, v, info):
+        # If the source object has amenities_list property, use it
+        if hasattr(info.context, "amenities_list") if info.context else False:
+            return info.context.amenities_list
+        # If it's a SQLAlchemy object with amenities_list property
+        elif hasattr(v, "amenities_list"):
+            return v.amenities_list
+        # If it's a JSON string, parse it
+        elif isinstance(v, str) and v:
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return v
