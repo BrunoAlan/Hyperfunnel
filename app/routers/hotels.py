@@ -162,27 +162,3 @@ def partial_update_hotel(
         db_hotel.images = db_hotel.images_list
 
     return db_hotel
-
-
-@router.get("/{hotel_id}/rooms/", response_model=List[schemas.Room])
-def get_hotel_rooms(hotel_id: str, db: Session = Depends(database.get_db)):
-    try:
-        # Validate that hotel_id is a valid UUID
-        hotel_uuid = UUID(hotel_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=400, detail="Invalid hotel ID format. Must be a valid UUID."
-        )
-
-    hotel = db.query(models.Hotel).filter(models.Hotel.id == hotel_uuid).first()
-    if hotel is None:
-        raise HTTPException(status_code=404, detail="Hotel not found")
-
-    rooms = db.query(models.Room).filter(models.Room.hotel_id == hotel_uuid).all()
-
-    # Convert images JSON string to list for each room
-    for room in rooms:
-        if hasattr(room, "images_list"):
-            room.images = room.images_list
-
-    return rooms

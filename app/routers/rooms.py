@@ -9,62 +9,22 @@ router = APIRouter(prefix="/rooms", tags=["rooms"])
 
 @router.get("/", response_model=List[schemas.Room])
 def get_rooms(db: Session = Depends(database.get_db)):
+    """Get all rooms"""
     rooms = db.query(models.Room).all()
 
-    # Convert images JSON string to list for each room
+    # Convert images and amenities JSON string to list for each room
     for room in rooms:
         if hasattr(room, "images_list"):
             room.images = room.images_list
+        if hasattr(room, "amenities_list"):
+            room.amenities = room.amenities_list
 
     return rooms
 
 
-@router.get("/{room_id}", response_model=schemas.Room)
-def get_room(room_id: str, db: Session = Depends(database.get_db)):
-    try:
-        # Validate that room_id is a valid UUID
-        room_uuid = UUID(room_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=400, detail="Invalid room ID format. Must be a valid UUID."
-        )
-
-    room = db.query(models.Room).filter(models.Room.id == room_uuid).first()
-    if room is None:
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    # Convert images JSON string to list for API response
-    if hasattr(room, "images_list"):
-        room.images = room.images_list
-
-    return room
-
-
-@router.get("/{room_id}/with-hotel", response_model=schemas.RoomWithHotel)
-def get_room_with_hotel(room_id: str, db: Session = Depends(database.get_db)):
-    try:
-        # Validate that room_id is a valid UUID
-        room_uuid = UUID(room_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=400, detail="Invalid room ID format. Must be a valid UUID."
-        )
-
-    room = db.query(models.Room).filter(models.Room.id == room_uuid).first()
-    if room is None:
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    # Convert images JSON string to list for API response
-    if hasattr(room, "images_list"):
-        room.images = room.images_list
-
-    return room
-
-
-@router.post("/hotels/{hotel_id}/", response_model=schemas.Room)
-def create_room(
-    hotel_id: str, room: schemas.RoomCreate, db: Session = Depends(database.get_db)
-):
+@router.get("/by-hotel/{hotel_id}", response_model=List[schemas.Room])
+def get_rooms_by_hotel(hotel_id: str, db: Session = Depends(database.get_db)):
+    """Get all rooms for a specific hotel"""
     try:
         # Validate that hotel_id is a valid UUID
         hotel_uuid = UUID(hotel_id)
@@ -73,31 +33,171 @@ def create_room(
             status_code=400, detail="Invalid hotel ID format. Must be a valid UUID."
         )
 
-    # Verificar que el hotel existe
+    # Check if hotel exists
+    hotel = db.query(models.Hotel).filter(models.Hotel.id == hotel_uuid).first()
+    if hotel is None:
+        raise HTTPException(status_code=404, detail="Hotel not found")
+
+    # Get all rooms for this hotel
+    rooms = db.query(models.Room).filter(models.Room.hotel_id == hotel_uuid).all()
+
+    # Convert images and amenities JSON string to list for each room
+    for room in rooms:
+        if hasattr(room, "images_list"):
+            room.images = room.images_list
+        if hasattr(room, "amenities_list"):
+            room.amenities = room.amenities_list
+
+    return rooms
+
+
+@router.get("/{room_id}", response_model=schemas.Room)
+def get_room(room_id: str, db: Session = Depends(database.get_db)):
+    """Get a specific room by ID"""
+    try:
+        # Validate that room_id is a valid UUID
+        room_uuid = UUID(room_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid room ID format. Must be a valid UUID."
+        )
+
+    room = db.query(models.Room).filter(models.Room.id == room_uuid).first()
+    if room is None:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    # Convert images and amenities JSON string to list for API response
+    if hasattr(room, "images_list"):
+        room.images = room.images_list
+    if hasattr(room, "amenities_list"):
+        room.amenities = room.amenities_list
+
+    return room
+
+
+@router.get("/{room_id}/with-hotel", response_model=schemas.RoomWithHotel)
+def get_room_with_hotel(room_id: str, db: Session = Depends(database.get_db)):
+    """Get a room with its hotel information"""
+    try:
+        # Validate that room_id is a valid UUID
+        room_uuid = UUID(room_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid room ID format. Must be a valid UUID."
+        )
+
+    room = db.query(models.Room).filter(models.Room.id == room_uuid).first()
+    if room is None:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    # Convert images and amenities JSON string to list for API response
+    if hasattr(room, "images_list"):
+        room.images = room.images_list
+    if hasattr(room, "amenities_list"):
+        room.amenities = room.amenities_list
+
+    return room
+
+
+@router.post("/", response_model=schemas.Room)
+def create_room(
+    room_data: schemas.RoomCreateWithHotel, db: Session = Depends(database.get_db)
+):
+    """Create a new room"""
+    try:
+        # Validate that hotel_id is a valid UUID
+        hotel_uuid = UUID(room_data.hotel_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid hotel ID format. Must be a valid UUID."
+        )
+
+    # Check if hotel exists
     hotel = db.query(models.Hotel).filter(models.Hotel.id == hotel_uuid).first()
     if hotel is None:
         raise HTTPException(status_code=404, detail="Hotel not found")
 
     # Convert images list to JSON string for storage
     images_json = None
-    if room.images:
+    if room_data.images:
         import json
 
-        images_json = json.dumps(room.images)
+        images_json = json.dumps(room_data.images)
+
+    # Convert amenities list to JSON string for storage
+    amenities_json = None
+    if room_data.amenities:
+        import json
+
+        amenities_json = json.dumps(room_data.amenities)
 
     db_room = models.Room(
         hotel_id=hotel_uuid,
-        name=room.name,
-        description=room.description,
-        price=room.price,
+        name=room_data.name,
+        description=room_data.description,
+        price=room_data.price,
         images=images_json,
+        amenities=amenities_json,
     )
     db.add(db_room)
     db.commit()
     db.refresh(db_room)
 
-    # Convert images back to list for API response
+    # Convert images and amenities back to list for API response
     if hasattr(db_room, "images_list"):
         db_room.images = db_room.images_list
+    if hasattr(db_room, "amenities_list"):
+        db_room.amenities = db_room.amenities_list
+
+    return db_room
+
+
+@router.put("/{room_id}", response_model=schemas.Room)
+def update_room(
+    room_id: str,
+    room_update: schemas.RoomUpdate,
+    db: Session = Depends(database.get_db),
+):
+    """Update a room completely"""
+    try:
+        # Validate that room_id is a valid UUID
+        room_uuid = UUID(room_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid room ID format. Must be a valid UUID."
+        )
+
+    # Check if room exists
+    db_room = db.query(models.Room).filter(models.Room.id == room_uuid).first()
+    if db_room is None:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    # Update only the fields that are provided
+    update_data = room_update.model_dump(exclude_unset=True)
+
+    # Handle images conversion if provided
+    if "images" in update_data:
+        import json
+
+        update_data["images"] = json.dumps(update_data["images"])
+
+    # Handle amenities conversion if provided
+    if "amenities" in update_data:
+        import json
+
+        update_data["amenities"] = json.dumps(update_data["amenities"])
+
+    # Update the room
+    for field, value in update_data.items():
+        setattr(db_room, field, value)
+
+    db.commit()
+    db.refresh(db_room)
+
+    # Convert images and amenities back to list for API response
+    if hasattr(db_room, "images_list"):
+        db_room.images = db_room.images_list
+    if hasattr(db_room, "amenities_list"):
+        db_room.amenities = db_room.amenities_list
 
     return db_room
