@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
+    container_name: hyperfunnel-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: hyperfunnel
+      POSTGRES_USER: hyperfunnel_user
+      POSTGRES_PASSWORD: hyperfunnel_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - hyperfunnel-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  hyperfunnel-network:
+    driver: bridge
