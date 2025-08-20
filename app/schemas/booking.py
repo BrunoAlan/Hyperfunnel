@@ -11,7 +11,7 @@ class BookingBase(BaseModel):
     check_in_date: date = Field(..., description="Check-in date")
     check_out_date: date = Field(..., description="Check-out date")
     guests: int = Field(default=1, ge=1, le=10, description="Number of guests")
-    price: float = Field(..., gt=0, description="Price per night")
+    price: float = Field(..., gt=0, description="Total price for the entire stay")
     status: BookingStatus = BookingStatus.PENDING
 
     @field_validator("check_out_date")
@@ -29,8 +29,32 @@ class BookingBase(BaseModel):
         return v
 
 
-class BookingCreate(BookingBase):
-    pass
+class BookingCreate(BaseModel):
+    """Schema for creating a new booking with automatic price calculation"""
+
+    hotel: UUID
+    room: UUID
+    check_in_date: date = Field(..., description="Check-in date")
+    check_out_date: date = Field(..., description="Check-out date")
+    guests: int = Field(default=1, ge=1, le=10, description="Number of guests")
+    price: Optional[float] = Field(
+        None, gt=0, description="Total price (auto-calculated if not provided)"
+    )
+    status: BookingStatus = BookingStatus.PENDING
+
+    @field_validator("check_out_date")
+    @classmethod
+    def validate_checkout_after_checkin(cls, v, info):
+        if "check_in_date" in info.data and v <= info.data["check_in_date"]:
+            raise ValueError("Check-out date must be after check-in date")
+        return v
+
+    @field_validator("check_in_date")
+    @classmethod
+    def validate_checkin_not_past(cls, v):
+        if v < date.today():
+            raise ValueError("Check-in date cannot be in the past")
+        return v
 
 
 class BookingUpdate(BaseModel):
@@ -39,7 +63,9 @@ class BookingUpdate(BaseModel):
     check_in_date: Optional[date] = Field(None, description="Check-in date")
     check_out_date: Optional[date] = Field(None, description="Check-out date")
     guests: Optional[int] = Field(None, ge=1, le=10, description="Number of guests")
-    price: Optional[float] = Field(None, gt=0, description="Price per night")
+    price: Optional[float] = Field(
+        None, gt=0, description="Total price (auto-calculated if not provided)"
+    )
     status: Optional[BookingStatus] = None
 
 
@@ -58,7 +84,7 @@ class Booking(BookingBase):
     @property
     def total_price(self) -> float:
         """Calculate total price based on nights"""
-        return self.price * self.nights
+        return self.price
 
 
 class BookingWithDetails(Booking):
