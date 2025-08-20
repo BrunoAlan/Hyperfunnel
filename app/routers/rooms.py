@@ -97,6 +97,15 @@ def get_room_with_hotel(room_id: str, db: Session = Depends(database.get_db)):
     if hasattr(room, "amenities_list"):
         room.amenities = room.amenities_list
 
+    # Get hotel information
+    hotel = db.query(models.Hotel).filter(models.Hotel.id == room.hotel_id).first()
+    if hotel:
+        # Convert hotel images JSON string to list for API response
+        if hasattr(hotel, "images_list"):
+            hotel.images = hotel.images_list
+        # Add hotel to room object
+        room.hotel = hotel
+
     return room
 
 
