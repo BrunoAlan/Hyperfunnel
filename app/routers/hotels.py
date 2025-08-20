@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from .. import database
 from ..models import Hotel, Room
@@ -10,9 +10,23 @@ from ..schemas.relationships import HotelWithRooms
 router = APIRouter(prefix="/hotels", tags=["hotels"])
 
 
+# filter by country and city using query params and orm sin case sensitive
 @router.get("", response_model=List[HotelSchema])
-def get_hotels(db: Session = Depends(database.get_db)):
-    hotels = db.query(Hotel).all()
+def get_hotels(
+    db: Session = Depends(database.get_db),
+    country: Optional[str] = None,
+    city: Optional[str] = None,
+):
+    query = db.query(Hotel)
+
+    if country:
+        query = query.filter(Hotel.country.ilike(f"%{country}%"))
+
+    if city:
+        query = query.filter(Hotel.city.ilike(f"%{city}%"))
+
+    hotels = query.all()
+
     # Convert each hotel to use the images_list property
     for hotel in hotels:
         if hasattr(hotel, "images_list"):
