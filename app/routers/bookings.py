@@ -12,8 +12,32 @@ from ..schemas import (
     BookingUpdate,
     BookingWithDetails,
 )
+from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
+
+
+class BookingQuoteRequest(BaseModel):
+    """Schema for requesting a booking quote"""
+
+    room_id: UUID
+    check_in_date: date = Field(..., description="Check-in date")
+    check_out_date: date = Field(..., description="Check-out date")
+    guests: int = Field(default=1, ge=1, le=10, description="Number of guests")
+
+    @field_validator("check_out_date")
+    @classmethod
+    def validate_checkout_after_checkin(cls, v, info):
+        if "check_in_date" in info.data and v <= info.data["check_in_date"]:
+            raise ValueError("Check-out date must be after check-in date")
+        return v
+
+    @field_validator("check_in_date")
+    @classmethod
+    def validate_checkin_not_past(cls, v):
+        if v < date.today():
+            raise ValueError("Check-in date cannot be in the past")
+        return v
 
 
 # Utility functions for availability management
@@ -527,50 +551,47 @@ def cancel_booking(booking_id: str, db: Session = Depends(database.get_db)):
 
 @router.post("/quote")
 def get_booking_quote(
-    room_id: UUID,
-    check_in_date: date,
-    check_out_date: date,
-    guests: int = 1,
+    quote_request: BookingQuoteRequest,
     db: Session = Depends(database.get_db),
 ):
     """Get a price quote for a booking without creating it"""
 
-    # Validate dates
-    if check_in_date >= check_out_date:
-        raise HTTPException(
-            status_code=400, detail="Check-out date must be after check-in date"
-        )
-
-    if check_in_date < date.today():
-        raise HTTPException(
-            status_code=400, detail="Check-in date cannot be in the past"
-        )
-
     # Validate room exists
-    room = db.query(Room).filter(Room.id == room_id).first()
+    room = db.query(Room).filter(Room.id == quote_request.room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
     # Check availability
-    if not check_room_availability(db, room_id, check_in_date, check_out_date, guests):
+    if not check_room_availability(
+        db,
+        quote_request.room_id,
+        quote_request.check_in_date,
+        quote_request.check_out_date,
+        quote_request.guests,
+    ):
         raise HTTPException(
             status_code=409,
-            detail=f"Room not available for the requested dates ({check_in_date} to {check_out_date}) for {guests} guests",
+            detail=f"Room not available for the requested dates ({quote_request.check_in_date} to {quote_request.check_out_date}) for {quote_request.guests} guests",
         )
 
     # Calculate price
-    total_price = calculate_booking_price(db, room_id, check_in_date, check_out_date)
-    nights = (check_out_date - check_in_date).days
+    total_price = calculate_booking_price(
+        db,
+        quote_request.room_id,
+        quote_request.check_in_date,
+        quote_request.check_out_date,
+    )
+    nights = (quote_request.check_out_date - quote_request.check_in_date).days
 
     # Get price breakdown by date
     price_breakdown = []
-    current_date = check_in_date
-    while current_date < check_out_date:
+    current_date = quote_request.check_in_date
+    while current_date < quote_request.check_out_date:
         availability = (
             db.query(Availability)
             .filter(
                 and_(
-                    Availability.room_id == room_id,
+                    Availability.room_id == quote_request.room_id,
                     Availability.date == current_date,
                 )
             )
@@ -593,16 +614,16 @@ def get_booking_quote(
         current_date += timedelta(days=1)
 
     return {
-        "room_id": room_id,
+        "room_id": quote_request.room_id,
         "room_name": room.name,
-        "check_in_date": check_in_date,
-        "check_out_date": check_out_date,
-        "guests": guests,
+        "check_in_date": quote_request.check_in_date,
+        "check_out_date": quote_request.check_out_date,
+        "guests": quote_request.guests,
         "nights": nights,
         "total_price": total_price,
         "average_price_per_night": total_price / nights if nights > 0 else 0,
         "price_breakdown": price_breakdown,
-        "currency": "EUR",  # You might want to make this configurable
+        "currency": "USD",  # You might want to make this configurable
         "availability_confirmed": True,
     }
 
@@ -645,3 +666,26 @@ def get_bookings_by_room(room_id: str, db: Session = Depends(database.get_db)):
 
     bookings = db.query(Booking).filter(Booking.room == room_uuid).all()
     return bookings
+
+
+class BookingQuoteRequest(BaseModel):
+    """Schema for requesting a booking quote"""
+
+    room_id: UUID
+    check_in_date: date = Field(..., description="Check-in date")
+    check_out_date: date = Field(..., description="Check-out date")
+    guests: int = Field(default=1, ge=1, le=10, description="Number of guests")
+
+    @field_validator("check_out_date")
+    @classmethod
+    def validate_checkout_after_checkin(cls, v, info):
+        if "check_in_date" in info.data and v <= info.data["check_in_date"]:
+            raise ValueError("Check-out date must be after check-in date")
+        return v
+
+    @field_validator("check_in_date")
+    @classmethod
+    def validate_checkin_not_past(cls, v):
+        if v < date.today():
+            raise ValueError("Check-in date cannot be in the past")
+        return v
