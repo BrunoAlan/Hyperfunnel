@@ -21,8 +21,10 @@ router = APIRouter(prefix="/availability", tags=["availability"])
 @router.get("", response_model=List[AvailabilitySchema])
 def get_availability(
     room_id: Optional[UUID] = Query(None, description="Filter by room ID"),
-    start_date: Optional[date] = Query(None, description="Start date for range"),
-    end_date: Optional[date] = Query(None, description="End date for range"),
+    check_in_date: Optional[date] = Query(None, description="Check-in date for range"),
+    check_out_date: Optional[date] = Query(
+        None, description="Check-out date for range"
+    ),
     available_only: bool = Query(False, description="Show only available dates"),
     db: Session = Depends(database.get_db),
 ):
@@ -32,11 +34,11 @@ def get_availability(
     if room_id:
         query = query.filter(Availability.room_id == room_id)
 
-    if start_date:
-        query = query.filter(Availability.date >= start_date)
+    if check_in_date:
+        query = query.filter(Availability.date >= check_in_date)
 
-    if end_date:
-        query = query.filter(Availability.date <= end_date)
+    if check_out_date:
+        query = query.filter(Availability.date <= check_out_date)
 
     if available_only:
         query = query.filter(
@@ -119,15 +121,16 @@ def create_availability_range(
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    if availability_range.start_date > availability_range.end_date:
+    if availability_range.check_in_date > availability_range.check_out_date:
         raise HTTPException(
-            status_code=400, detail="Start date must be before or equal to end date"
+            status_code=400,
+            detail="Check-in date must be before or equal to check-out date",
         )
 
     created_records = []
-    current_date = availability_range.start_date
+    current_date = availability_range.check_in_date
 
-    while current_date <= availability_range.end_date:
+    while current_date <= availability_range.check_out_date:
         # Check if availability already exists for this room and date
         existing = (
             db.query(Availability)
@@ -229,11 +232,11 @@ def search_availability(
 
     This endpoint ensures that rooms are available for ALL days in the requested date range.
     A room will only be returned if it has availability records for every single day
-    between start_date and end_date (inclusive).
+    between check_in_date and check_out_date (inclusive).
     """
 
     # Calculate the number of days in the requested range
-    days_needed = (search_params.end_date - search_params.start_date).days + 1
+    days_needed = (search_params.check_out_date - search_params.check_in_date).days + 1
 
     # Base query to get availability records within the date range
     base_query = db.query(Availability).join(Room)
@@ -241,8 +244,8 @@ def search_availability(
     # Filter by date range
     base_query = base_query.filter(
         and_(
-            Availability.date >= search_params.start_date,
-            Availability.date <= search_params.end_date,
+            Availability.date >= search_params.check_in_date,
+            Availability.date <= search_params.check_out_date,
         )
     )
 
@@ -280,9 +283,9 @@ def search_availability(
         record_dates = {record.date for record in records}
 
         # Generate all dates in the requested range
-        current_date = search_params.start_date
+        current_date = search_params.check_in_date
         required_dates = set()
-        while current_date <= search_params.end_date:
+        while current_date <= search_params.check_out_date:
             required_dates.add(current_date)
             current_date += timedelta(days=1)
 
@@ -327,8 +330,8 @@ def search_availability(
 @router.get("/room/{room_id}/calendar", response_model=List[AvailabilitySchema])
 def get_room_calendar(
     room_id: str,
-    start_date: date = Query(..., description="Start date for calendar"),
-    end_date: date = Query(..., description="End date for calendar"),
+    check_in_date: date = Query(..., description="Check-in date for calendar"),
+    check_out_date: date = Query(..., description="Check-out date for calendar"),
     db: Session = Depends(database.get_db),
 ):
     """Get availability calendar for a specific room"""
@@ -344,9 +347,10 @@ def get_room_calendar(
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    if start_date > end_date:
+    if check_in_date > check_out_date:
         raise HTTPException(
-            status_code=400, detail="Start date must be before or equal to end date"
+            status_code=400,
+            detail="Check-in date must be before or equal to check-out date",
         )
 
     availability_records = (
@@ -354,8 +358,8 @@ def get_room_calendar(
         .filter(
             and_(
                 Availability.room_id == room_uuid,
-                Availability.date >= start_date,
-                Availability.date <= end_date,
+                Availability.date >= check_in_date,
+                Availability.date <= check_out_date,
             )
         )
         .order_by(Availability.date)
@@ -368,8 +372,8 @@ def get_room_calendar(
 @router.post("/room/{room_id}/block-dates")
 def block_dates(
     room_id: str,
-    start_date: date = Query(..., description="Start date to block"),
-    end_date: date = Query(..., description="End date to block"),
+    check_in_date: date = Query(..., description="Check-in date to block"),
+    check_out_date: date = Query(..., description="Check-out date to block"),
     db: Session = Depends(database.get_db),
 ):
     """Block dates for a specific room (set is_blocked=True)"""
@@ -385,17 +389,18 @@ def block_dates(
     if room is None:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    if start_date > end_date:
+    if check_in_date > check_out_date:
         raise HTTPException(
-            status_code=400, detail="Start date must be before or equal to end date"
+            status_code=400,
+            detail="Check-in date must be before or equal to check-out date",
         )
 
     # Update existing records or create new ones as blocked
-    current_date = start_date
+    current_date = check_in_date
     updated_count = 0
     created_count = 0
 
-    while current_date <= end_date:
+    while current_date <= check_out_date:
         existing = (
             db.query(Availability)
             .filter(
@@ -426,7 +431,8 @@ def block_dates(
     db.commit()
 
     return {
-        "message": f"Blocked dates from {start_date} to {end_date}",
+        "message": f"Blocked dates from {check_in_date} to {check_out_date}",
         "updated_records": updated_count,
         "created_records": created_count,
+        "total_blocked": updated_count + created_count,
     }

@@ -186,13 +186,14 @@ def verify_availability():
         print(f"\n🔍 Verifying configuration...")
 
         # Count availability records for September 2025
-        september_start = date(YEAR, MONTH, 1)
-        september_end = date(YEAR, MONTH, 30)
+        september_check_in = date(YEAR, MONTH, 1)
+        september_check_out = date(YEAR, MONTH, 30)
 
         availability_count = (
             db.query(Availability)
             .filter(
-                Availability.date >= september_start, Availability.date <= september_end
+                Availability.date >= september_check_in,
+                Availability.date <= september_check_out,
             )
             .count()
         )
@@ -211,8 +212,8 @@ def verify_availability():
         blocked_count = (
             db.query(Availability)
             .filter(
-                Availability.date >= september_start,
-                Availability.date <= september_end,
+                Availability.date >= september_check_in,
+                Availability.date <= september_check_out,
                 Availability.is_blocked == True,
             )
             .count()
@@ -226,8 +227,8 @@ def verify_availability():
         unavailable_count = (
             db.query(Availability)
             .filter(
-                Availability.date >= september_start,
-                Availability.date <= september_end,
+                Availability.date >= september_check_in,
+                Availability.date <= september_check_out,
                 Availability.available_rooms == 0,
             )
             .count()

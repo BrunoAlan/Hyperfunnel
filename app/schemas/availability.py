@@ -52,8 +52,8 @@ class AvailabilityRange(BaseModel):
     """Schema for creating availability for a range of dates"""
 
     room_id: UUID
-    start_date: date
-    end_date: date
+    check_in_date: date
+    check_out_date: date
     total_rooms: int = Field(
         default=5, ge=1, le=10, description="Total rooms of this type (1-10)"
     )
@@ -73,8 +73,8 @@ class AvailabilitySearch(BaseModel):
 
     hotel_id: Optional[UUID] = None
     room_id: Optional[UUID] = None
-    start_date: date
-    end_date: date
+    check_in_date: date
+    check_out_date: date
     min_rooms: int = Field(
         default=1, ge=1, description="Minimum number of rooms needed"
     )
