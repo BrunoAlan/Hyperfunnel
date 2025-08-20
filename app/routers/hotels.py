@@ -10,7 +10,7 @@ from ..schemas.relationships import HotelWithRooms
 router = APIRouter(prefix="/hotels", tags=["hotels"])
 
 
-@router.get("/", response_model=List[HotelSchema])
+@router.get("", response_model=List[HotelSchema])
 def get_hotels(db: Session = Depends(database.get_db)):
     hotels = db.query(Hotel).all()
     # Convert each hotel to use the images_list property
@@ -75,7 +75,7 @@ def get_hotel_with_rooms(hotel_id: str, db: Session = Depends(database.get_db)):
     return hotel
 
 
-@router.post("/", response_model=HotelSchema)
+@router.post("", response_model=HotelSchema)
 def create_hotel(hotel: HotelCreate, db: Session = Depends(database.get_db)):
     # Convert images list to JSON string for storage
     images_json = None

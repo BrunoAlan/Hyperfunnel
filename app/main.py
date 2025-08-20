@@ -9,7 +9,7 @@ from .models import Hotel, Room, Availability  # noqa: F401
 # Create tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(redirect_slashes=False)
 
 # Include routers
 app.include_router(hotels.router)

@@ -16,7 +16,7 @@ from ..schemas.relationships import RoomWithHotel
 router = APIRouter(prefix="/rooms", tags=["rooms"])
 
 
-@router.get("/", response_model=List[RoomSchema])
+@router.get("", response_model=List[RoomSchema])
 def get_rooms(db: Session = Depends(database.get_db)):
     """Get all rooms"""
     rooms = db.query(Room).all()
@@ -117,7 +117,7 @@ def get_room_with_hotel(room_id: str, db: Session = Depends(database.get_db)):
     return room
 
 
-@router.post("/", response_model=RoomSchema)
+@router.post("", response_model=RoomSchema)
 def create_room(room_data: dict, db: Session = Depends(database.get_db)):
     """Create a new room"""
     try:

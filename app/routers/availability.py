@@ -18,7 +18,7 @@ from ..schemas import (
 router = APIRouter(prefix="/availability", tags=["availability"])
 
 
-@router.get("/", response_model=List[AvailabilitySchema])
+@router.get("", response_model=List[AvailabilitySchema])
 def get_availability(
     room_id: Optional[UUID] = Query(None, description="Filter by room ID"),
     start_date: Optional[date] = Query(None, description="Start date for range"),
@@ -72,7 +72,7 @@ def get_availability_by_id(
     return availability
 
 
-@router.post("/", response_model=AvailabilitySchema)
+@router.post("", response_model=AvailabilitySchema)
 def create_availability(
     availability: AvailabilityCreate, db: Session = Depends(database.get_db)
 ):
