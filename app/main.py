@@ -1,7 +1,8 @@
 from fastapi import FastAPI
+
 from . import database
 from .database import engine, Base
-from .routers import hotels, rooms, availability, seed, bookings
+from .routers import hotels, rooms, availability, seed, bookings, destinations
 
 # Import models to register them with SQLAlchemy
 from .models import Hotel, Room, Availability, Booking
@@ -17,6 +18,7 @@ app.include_router(rooms.router)
 app.include_router(availability.router)
 app.include_router(bookings.router)
 app.include_router(seed.router)
+app.include_router(destinations.router)
 
 
 @app.get("/")
