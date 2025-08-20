@@ -66,6 +66,9 @@ def get_booking_with_details(booking_id: str, db: Session = Depends(database.get
         "booking_id": booking.booking_id,
         "hotel": booking.hotel,
         "room": booking.room,
+        "check_in_date": booking.check_in_date,
+        "check_out_date": booking.check_out_date,
+        "guests": booking.guests,
         "price": booking.price,
         "status": booking.status,
         "created_at": booking.created_at,
@@ -103,6 +106,9 @@ def create_booking(booking: BookingCreate, db: Session = Depends(database.get_db
     db_booking = Booking(
         hotel=booking.hotel,
         room=booking.room,
+        check_in_date=booking.check_in_date,
+        check_out_date=booking.check_out_date,
+        guests=booking.guests,
         price=booking.price,
         status=booking.status,
     )
@@ -150,6 +156,9 @@ def update_booking(
     # Update all fields
     db_booking.hotel = booking.hotel
     db_booking.room = booking.room
+    db_booking.check_in_date = booking.check_in_date
+    db_booking.check_out_date = booking.check_out_date
+    db_booking.guests = booking.guests
     db_booking.price = booking.price
     db_booking.status = booking.status
 

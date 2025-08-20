@@ -2,9 +2,11 @@ from sqlalchemy import (
     Column,
     String,
     DateTime,
+    Date,
     ForeignKey,
     Float,
     Enum,
+    Integer,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
@@ -31,6 +33,13 @@ class Booking(Base):
     hotel = Column(UUID(as_uuid=True), ForeignKey("hotels.id"), nullable=False)
     room = Column(UUID(as_uuid=True), ForeignKey("rooms.id"), nullable=False)
 
+    # Booking dates
+    check_in_date = Column(Date, nullable=False)
+    check_out_date = Column(Date, nullable=False)
+
+    # Guest information
+    guests = Column(Integer, nullable=False, default=1)
+
     # Pricing
     price = Column(Float, nullable=False)
 
@@ -45,5 +54,15 @@ class Booking(Base):
     hotel_ref = relationship("Hotel", foreign_keys=[hotel], backref="bookings")
     room_ref = relationship("Room", foreign_keys=[room], backref="bookings")
 
+    @property
+    def nights(self) -> int:
+        """Calculate the number of nights for this booking"""
+        return (self.check_out_date - self.check_in_date).days
+
+    @property
+    def total_price(self) -> float:
+        """Calculate total price based on nights and guests"""
+        return self.price * self.nights
+
     def __repr__(self):
-        return f"<Booking {self.booking_id}: {self.status}>"
+        return f"<Booking {self.booking_id}: {self.status} ({self.check_in_date} to {self.check_out_date})>"
