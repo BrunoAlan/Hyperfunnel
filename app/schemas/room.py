@@ -9,6 +9,9 @@ class RoomBase(BaseModel):
     name: str
     description: Optional[str] = None
     price: float = Field(..., gt=0, description="Price must be greater than 0")
+    guest: int = Field(
+        ..., gt=0, description="Number of guests the room can accommodate"
+    )
     images: Optional[List[str]] = Field(None, description="List of image URLs")
     amenities: Optional[List[str]] = Field(None, description="List of room amenities")
 
@@ -27,6 +30,7 @@ class RoomUpdate(BaseModel):
     price: Optional[float] = Field(
         None, gt=0, description="Price must be greater than 0"
     )
+    guest: Optional[int] = Field(None, gt=0, description="Number of guests")
     images: Optional[List[str]] = Field(None, description="List of image URLs")
     amenities: Optional[List[str]] = Field(None, description="List of room amenities")
 
@@ -37,6 +41,7 @@ class RoomUpdateDB(BaseModel):
     price: Optional[float] = Field(
         None, gt=0, description="Price must be greater than 0"
     )
+    guest: Optional[int] = Field(None, gt=0, description="Number of guests")
     images: Optional[str] = Field(None, description="JSON string of image URLs")
     amenities: Optional[str] = Field(None, description="JSON string of amenities")
 

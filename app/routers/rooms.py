@@ -148,6 +148,7 @@ def create_room(room_data: dict, db: Session = Depends(database.get_db)):
         name=room_data["name"],
         description=room_data.get("description"),
         price=room_data["price"],
+        guest=room_data["guest"],
         images=images_json,
         amenities=amenities_json,
     )
