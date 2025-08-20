@@ -26,6 +26,12 @@ from .availability import (
     AvailabilityRange,
     AvailabilitySearch,
 )
+from .booking import (
+    Booking,
+    BookingCreate,
+    BookingUpdate,
+    BookingWithDetails,
+)
 
 __all__ = [
     # Hotel schemas
@@ -51,4 +57,9 @@ __all__ = [
     "AvailabilityWithRoom",
     "AvailabilityRange",
     "AvailabilitySearch",
+    # Booking schemas
+    "Booking",
+    "BookingCreate",
+    "BookingUpdate",
+    "BookingWithDetails",
 ]
