@@ -25,7 +25,7 @@ class Room(Base):
     name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     price = Column(Float, nullable=False)
-    guest = Column(Integer, nullable=False, default=1)
+    guest = Column(Integer, nullable=False, default=4)
     images = Column(Text, nullable=True)
     amenities = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

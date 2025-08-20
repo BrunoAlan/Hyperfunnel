@@ -26,7 +26,7 @@ def upgrade() -> None:
     op.add_column("rooms", sa.Column("guest", sa.Integer(), nullable=True))
 
     # Update existing rows with default value
-    op.execute("UPDATE rooms SET guest = 1 WHERE guest IS NULL")
+    op.execute("UPDATE rooms SET guest = 4 WHERE guest IS NULL")
 
     # Then make it NOT NULL
     op.alter_column("rooms", "guest", nullable=False)
