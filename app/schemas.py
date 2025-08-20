@@ -1,3 +1,4 @@
+import json
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from uuid import UUID
@@ -37,13 +38,14 @@ class RoomBase(BaseModel):
     description: Optional[str] = None
     price: float = Field(..., gt=0, description="Price must be greater than 0")
     images: Optional[List[str]] = Field(None, description="List of image URLs")
+    amenities: Optional[List[str]] = Field(None, description="List of room amenities")
 
 
 class RoomCreate(RoomBase):
     pass
 
 
-class Room(RoomBase):
+class Room(BaseModel):
     id: UUID
     hotel_id: UUID
     created_at: datetime
@@ -57,6 +59,24 @@ class Room(RoomBase):
         if hasattr(obj, "images_list"):
             obj.images = obj.images_list
         return super().model_validate(obj)
+
+    @property
+    def amenities_list(self) -> Optional[List[str]]:
+        """Convert amenities JSON string to list"""
+        if self.amenities:
+            try:
+                return json.loads(self.amenities)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return None
+
+    @amenities_list.setter
+    def amenities_list(self, value: Optional[List[str]]):
+        """Convert amenities list to JSON string"""
+        if value is not None:
+            self.amenities = json.dumps(value)
+        else:
+            self.amenities = None
 
 
 class Hotel(HotelBase):
