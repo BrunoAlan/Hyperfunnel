@@ -233,6 +233,9 @@ def search_availability(
     This endpoint ensures that rooms are available for ALL days in the requested date range.
     A room will only be returned if it has availability records for every single day
     between check_in_date and check_out_date (inclusive).
+
+    Additionally, rooms are filtered by guest capacity - only rooms that can accommodate
+    the requested number of guests (search_params.guests) will be returned.
     """
 
     # Calculate the number of days in the requested range
@@ -264,6 +267,9 @@ def search_availability(
     # Filter by room if provided
     if search_params.room_id:
         base_query = base_query.filter(Availability.room_id == search_params.room_id)
+
+    # Filter by guest capacity - only include rooms that can accommodate the requested number of guests
+    base_query = base_query.filter(Room.guest >= search_params.guests)
 
     # Get all availability records that meet the basic criteria
     all_records = base_query.all()
@@ -299,6 +305,10 @@ def search_availability(
     # Convert the records to properly format the room data
     result = []
     for record in valid_rooms:
+        # Additional validation: ensure the room can accommodate the requested guests
+        if record.room.guest < search_params.guests:
+            continue  # Skip this room if it can't accommodate the guests
+
         # Convert the record to dict and manually handle room conversion
         record_dict = {
             "id": record.id,
