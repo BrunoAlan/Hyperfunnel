@@ -6,6 +6,7 @@ from uuid import UUID
 from datetime import date, timedelta
 from .. import database
 from ..models import Booking, Hotel, Room, Availability
+from ..models.booking import BookingStatus
 from ..schemas import (
     Booking as BookingSchema,
     BookingCreate,
@@ -533,8 +534,6 @@ def cancel_booking(booking_id: str, db: Session = Depends(database.get_db)):
         )
 
         # Update booking status to cancelled
-        from ..models.booking import BookingStatus
-
         db_booking.status = BookingStatus.CANCELLED
 
         db.commit()
@@ -550,6 +549,52 @@ def cancel_booking(booking_id: str, db: Session = Depends(database.get_db)):
         db.rollback()
         raise HTTPException(
             status_code=500, detail=f"Failed to cancel booking: {str(e)}"
+        )
+
+
+@router.post("/{booking_id}/checkout")
+def checkout_booking(booking_id: str, db: Session = Depends(database.get_db)):
+    """Fake checkout - Confirm a booking by changing status from PENDING to CONFIRMED"""
+    try:
+        # Validate that booking_id is a valid UUID
+        booking_uuid = UUID(booking_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid booking ID format. Must be a valid UUID."
+        )
+
+    db_booking = db.query(Booking).filter(Booking.booking_id == booking_uuid).first()
+    if db_booking is None:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    # Check if booking is in PENDING status
+    if db_booking.status != BookingStatus.PENDING:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Booking cannot be confirmed. Current status: {db_booking.status.value}. Only PENDING bookings can be confirmed.",
+        )
+
+    try:
+        # Update booking status to confirmed
+        db_booking.status = BookingStatus.CONFIRMED
+
+        db.commit()
+        db.refresh(db_booking)
+
+        return {
+            "message": "Booking confirmed successfully",
+            "booking_id": str(db_booking.booking_id),
+            "status": db_booking.status.value,
+            "check_in_date": db_booking.check_in_date,
+            "check_out_date": db_booking.check_out_date,
+            "guests": db_booking.guests,
+            "total_price": db_booking.price,
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to confirm booking: {str(e)}"
         )
 
 
