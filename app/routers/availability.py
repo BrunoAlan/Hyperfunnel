@@ -224,11 +224,22 @@ def delete_availability(availability_id: str, db: Session = Depends(database.get
 def search_availability(
     search_params: AvailabilitySearch, db: Session = Depends(database.get_db)
 ):
-    """Search for available rooms based on criteria"""
-    query = db.query(Availability).join(Room)
+    """
+    Search for available rooms based on criteria.
+
+    This endpoint ensures that rooms are available for ALL days in the requested date range.
+    A room will only be returned if it has availability records for every single day
+    between start_date and end_date (inclusive).
+    """
+
+    # Calculate the number of days in the requested range
+    days_needed = (search_params.end_date - search_params.start_date).days + 1
+
+    # Base query to get availability records within the date range
+    base_query = db.query(Availability).join(Room)
 
     # Filter by date range
-    query = query.filter(
+    base_query = base_query.filter(
         and_(
             Availability.date >= search_params.start_date,
             Availability.date <= search_params.end_date,
@@ -236,24 +247,55 @@ def search_availability(
     )
 
     # Filter by minimum available rooms
-    query = query.filter(Availability.available_rooms >= search_params.min_rooms)
+    base_query = base_query.filter(
+        Availability.available_rooms >= search_params.min_rooms
+    )
 
     # Filter by not blocked
-    query = query.filter(Availability.is_blocked == False)
+    base_query = base_query.filter(Availability.is_blocked == False)
 
     # Filter by hotel if provided
     if search_params.hotel_id:
-        query = query.filter(Room.hotel_id == search_params.hotel_id)
+        base_query = base_query.filter(Room.hotel_id == search_params.hotel_id)
 
     # Filter by room if provided
     if search_params.room_id:
-        query = query.filter(Availability.room_id == search_params.room_id)
+        base_query = base_query.filter(Availability.room_id == search_params.room_id)
 
-    availability_records = query.order_by(Availability.date, Room.name).all()
+    # Get all availability records that meet the basic criteria
+    all_records = base_query.all()
+
+    # Group records by room_id to check if each room has availability for ALL days
+    from collections import defaultdict
+
+    rooms_by_id = defaultdict(list)
+
+    for record in all_records:
+        rooms_by_id[record.room_id].append(record)
+
+    # Filter rooms that have availability for ALL days in the range
+    valid_rooms = []
+    for room_id, records in rooms_by_id.items():
+        # Check if this room has records for all required days
+        record_dates = {record.date for record in records}
+
+        # Generate all dates in the requested range
+        current_date = search_params.start_date
+        required_dates = set()
+        while current_date <= search_params.end_date:
+            required_dates.add(current_date)
+            current_date += timedelta(days=1)
+
+        # If the room has availability for all required dates, include it
+        if required_dates.issubset(record_dates):
+            valid_rooms.extend(records)
+
+    # Sort the valid records
+    valid_rooms.sort(key=lambda x: (x.date, x.room.name))
 
     # Convert the records to properly format the room data
     result = []
-    for record in availability_records:
+    for record in valid_rooms:
         # Convert the record to dict and manually handle room conversion
         record_dict = {
             "id": record.id,
