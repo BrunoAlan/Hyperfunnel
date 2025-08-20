@@ -16,6 +16,14 @@ class HotelCreate(HotelBase):
     pass
 
 
+class HotelUpdate(BaseModel):
+    name: Optional[str] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    stars: Optional[int] = Field(None, ge=1, le=5, description="Number of stars (1-5)")
+    images: Optional[str] = None
+
+
 class RoomBase(BaseModel):
     name: str
     description: Optional[str] = None

@@ -56,6 +56,60 @@ def create_hotel(hotel: schemas.HotelCreate, db: Session = Depends(database.get_
     return db_hotel
 
 
+@router.put("/{hotel_id}", response_model=schemas.Hotel)
+def update_hotel(
+    hotel_id: str, hotel: schemas.HotelCreate, db: Session = Depends(database.get_db)
+):
+    try:
+        # Validate that hotel_id is a valid UUID
+        hotel_uuid = UUID(hotel_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid hotel ID format. Must be a valid UUID."
+        )
+
+    db_hotel = db.query(models.Hotel).filter(models.Hotel.id == hotel_uuid).first()
+    if db_hotel is None:
+        raise HTTPException(status_code=404, detail="Hotel not found")
+
+    # Update all fields
+    db_hotel.name = hotel.name
+    db_hotel.country = hotel.country
+    db_hotel.city = hotel.city
+    db_hotel.stars = hotel.stars
+    db_hotel.images = hotel.images
+
+    db.commit()
+    db.refresh(db_hotel)
+    return db_hotel
+
+
+@router.patch("/{hotel_id}", response_model=schemas.Hotel)
+def partial_update_hotel(
+    hotel_id: str, hotel: schemas.HotelUpdate, db: Session = Depends(database.get_db)
+):
+    try:
+        # Validate that hotel_id is a valid UUID
+        hotel_uuid = UUID(hotel_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid hotel ID format. Must be a valid UUID."
+        )
+
+    db_hotel = db.query(models.Hotel).filter(models.Hotel.id == hotel_uuid).first()
+    if db_hotel is None:
+        raise HTTPException(status_code=404, detail="Hotel not found")
+
+    # Update only provided fields
+    update_data = hotel.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_hotel, field, value)
+
+    db.commit()
+    db.refresh(db_hotel)
+    return db_hotel
+
+
 @router.get("/{hotel_id}/rooms/", response_model=List[schemas.Room])
 def get_hotel_rooms(hotel_id: str, db: Session = Depends(database.get_db)):
     try:
