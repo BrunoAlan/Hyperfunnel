@@ -30,8 +30,8 @@ class Booking(Base):
     )
 
     # Foreign keys
-    hotel = Column(UUID(as_uuid=True), ForeignKey("hotels.id"), nullable=False)
-    room = Column(UUID(as_uuid=True), ForeignKey("rooms.id"), nullable=False)
+    hotel_id = Column(UUID(as_uuid=True), ForeignKey("hotels.id"), nullable=False)
+    room_id = Column(UUID(as_uuid=True), ForeignKey("rooms.id"), nullable=False)
 
     # Booking dates
     check_in_date = Column(Date, nullable=False)
@@ -51,8 +51,8 @@ class Booking(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    hotel_ref = relationship("Hotel", foreign_keys=[hotel], backref="bookings")
-    room_ref = relationship("Room", foreign_keys=[room], backref="bookings")
+    hotel_ref = relationship("Hotel", foreign_keys=[hotel_id], backref="bookings")
+    room_ref = relationship("Room", foreign_keys=[room_id], backref="bookings")
 
     @property
     def nights(self) -> int:

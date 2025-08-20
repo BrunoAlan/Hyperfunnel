@@ -6,8 +6,8 @@ from ..models.booking import BookingStatus
 
 
 class BookingBase(BaseModel):
-    hotel: UUID
-    room: UUID
+    hotel_id: UUID
+    room_id: UUID
     check_in_date: date = Field(..., description="Check-in date")
     check_out_date: date = Field(..., description="Check-out date")
     guests: int = Field(default=1, ge=1, le=10, description="Number of guests")
@@ -32,8 +32,8 @@ class BookingBase(BaseModel):
 class BookingCreate(BaseModel):
     """Schema for creating a new booking with automatic price calculation"""
 
-    hotel: UUID
-    room: UUID
+    hotel_id: UUID
+    room_id: UUID
     check_in_date: date = Field(..., description="Check-in date")
     check_out_date: date = Field(..., description="Check-out date")
     guests: int = Field(default=1, ge=1, le=10, description="Number of guests")
@@ -58,8 +58,8 @@ class BookingCreate(BaseModel):
 
 
 class BookingUpdate(BaseModel):
-    hotel: Optional[UUID] = None
-    room: Optional[UUID] = None
+    hotel_id: Optional[UUID] = None
+    room_id: Optional[UUID] = None
     check_in_date: Optional[date] = Field(None, description="Check-in date")
     check_out_date: Optional[date] = Field(None, description="Check-out date")
     guests: Optional[int] = Field(None, ge=1, le=10, description="Number of guests")

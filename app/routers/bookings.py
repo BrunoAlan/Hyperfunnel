@@ -231,8 +231,8 @@ def get_booking_with_details(booking_id: str, db: Session = Depends(database.get
     # Create response with details
     booking_dict = {
         "booking_id": booking.booking_id,
-        "hotel": booking.hotel,
-        "room": booking.room,
+        "hotel_id": booking.hotel_id,
+        "room_id": booking.room_id,
         "check_in_date": booking.check_in_date,
         "check_out_date": booking.check_out_date,
         "guests": booking.guests,
@@ -254,14 +254,14 @@ def get_booking_with_details(booking_id: str, db: Session = Depends(database.get
 def create_booking(booking: BookingCreate, db: Session = Depends(database.get_db)):
     """Create a new booking with automatic availability management"""
     # Validate that hotel exists
-    hotel = db.query(Hotel).filter(Hotel.id == booking.hotel).first()
+    hotel = db.query(Hotel).filter(Hotel.id == booking.hotel_id).first()
     if not hotel:
         raise HTTPException(status_code=404, detail="Hotel not found")
 
     # Validate that room exists and belongs to the hotel
     room = (
         db.query(Room)
-        .filter(Room.id == booking.room, Room.hotel_id == booking.hotel)
+        .filter(Room.id == booking.room_id, Room.hotel_id == booking.hotel_id)
         .first()
     )
     if not room:
@@ -272,7 +272,11 @@ def create_booking(booking: BookingCreate, db: Session = Depends(database.get_db
 
     # Check availability for the requested dates and guests
     if not check_room_availability(
-        db, booking.room, booking.check_in_date, booking.check_out_date, booking.guests
+        db,
+        booking.room_id,
+        booking.check_in_date,
+        booking.check_out_date,
+        booking.guests,
     ):
         raise HTTPException(
             status_code=409,
@@ -283,14 +287,14 @@ def create_booking(booking: BookingCreate, db: Session = Depends(database.get_db
     calculated_price = booking.price
     if calculated_price is None:
         calculated_price = calculate_booking_price(
-            db, booking.room, booking.check_in_date, booking.check_out_date
+            db, booking.room_id, booking.check_in_date, booking.check_out_date
         )
 
     try:
         # Reserve the room by decrementing availability
         reserve_room_availability(
             db,
-            booking.room,
+            booking.room_id,
             booking.check_in_date,
             booking.check_out_date,
             booking.guests,
@@ -298,8 +302,8 @@ def create_booking(booking: BookingCreate, db: Session = Depends(database.get_db
 
         # Create the booking
         db_booking = Booking(
-            hotel=booking.hotel,
-            room=booking.room,
+            hotel_id=booking.hotel_id,
+            room_id=booking.room_id,
             check_in_date=booking.check_in_date,
             check_out_date=booking.check_out_date,
             guests=booking.guests,
@@ -337,20 +341,20 @@ def update_booking(
         raise HTTPException(status_code=404, detail="Booking not found")
 
     # Store original booking data for availability restoration
-    original_room = db_booking.room
+    original_room = db_booking.room_id
     original_check_in = db_booking.check_in_date
     original_check_out = db_booking.check_out_date
     original_guests = db_booking.guests
 
     # Validate that hotel exists
-    hotel = db.query(Hotel).filter(Hotel.id == booking.hotel).first()
+    hotel = db.query(Hotel).filter(Hotel.id == booking.hotel_id).first()
     if not hotel:
         raise HTTPException(status_code=404, detail="Hotel not found")
 
     # Validate that room exists and belongs to the hotel
     room = (
         db.query(Room)
-        .filter(Room.id == booking.room, Room.hotel_id == booking.hotel)
+        .filter(Room.id == booking.room_id, Room.hotel_id == booking.hotel_id)
         .first()
     )
     if not room:
@@ -361,7 +365,7 @@ def update_booking(
 
     # Check if we need to update availability (dates, room, or guests changed)
     availability_changed = (
-        original_room != booking.room
+        original_room != booking.room_id
         or original_check_in != booking.check_in_date
         or original_check_out != booking.check_out_date
         or original_guests != booking.guests
@@ -371,7 +375,7 @@ def update_booking(
         # Check availability for new dates/room/guests
         if not check_room_availability(
             db,
-            booking.room,
+            booking.room_id,
             booking.check_in_date,
             booking.check_out_date,
             booking.guests,
@@ -385,7 +389,7 @@ def update_booking(
     calculated_price = booking.price
     if calculated_price is None or availability_changed:
         calculated_price = calculate_booking_price(
-            db, booking.room, booking.check_in_date, booking.check_out_date
+            db, booking.room_id, booking.check_in_date, booking.check_out_date
         )
 
     try:
@@ -402,15 +406,15 @@ def update_booking(
             # Reserve availability for new booking
             reserve_room_availability(
                 db,
-                booking.room,
+                booking.room_id,
                 booking.check_in_date,
                 booking.check_out_date,
                 booking.guests,
             )
 
         # Update all fields
-        db_booking.hotel = booking.hotel
-        db_booking.room = booking.room
+        db_booking.hotel_id = booking.hotel_id
+        db_booking.room_id = booking.room_id
         db_booking.check_in_date = booking.check_in_date
         db_booking.check_out_date = booking.check_out_date
         db_booking.guests = booking.guests
@@ -450,17 +454,17 @@ def partial_update_booking(
     update_data = booking.model_dump(exclude_unset=True)
 
     # Validate hotel and room if they are being updated
-    if "hotel" in update_data:
-        hotel = db.query(Hotel).filter(Hotel.id == update_data["hotel"]).first()
+    if "hotel_id" in update_data:
+        hotel = db.query(Hotel).filter(Hotel.id == update_data["hotel_id"]).first()
         if not hotel:
             raise HTTPException(status_code=404, detail="Hotel not found")
 
-    if "room" in update_data:
+    if "room_id" in update_data:
         # Get the hotel_id to validate the room
-        hotel_id = update_data.get("hotel", db_booking.hotel)
+        hotel_id = update_data.get("hotel_id", db_booking.hotel_id)
         room = (
             db.query(Room)
-            .filter(Room.id == update_data["room"], Room.hotel_id == hotel_id)
+            .filter(Room.id == update_data["room_id"], Room.hotel_id == hotel_id)
             .first()
         )
         if not room:
@@ -522,7 +526,7 @@ def cancel_booking(booking_id: str, db: Session = Depends(database.get_db)):
         # Restore room availability
         release_room_availability(
             db,
-            db_booking.room,
+            db_booking.room_id,
             db_booking.check_in_date,
             db_booking.check_out_date,
             db_booking.guests,
@@ -644,7 +648,7 @@ def get_bookings_by_hotel(hotel_id: str, db: Session = Depends(database.get_db))
     if not hotel:
         raise HTTPException(status_code=404, detail="Hotel not found")
 
-    bookings = db.query(Booking).filter(Booking.hotel == hotel_uuid).all()
+    bookings = db.query(Booking).filter(Booking.hotel_id == hotel_uuid).all()
     return bookings
 
 
@@ -664,7 +668,7 @@ def get_bookings_by_room(room_id: str, db: Session = Depends(database.get_db)):
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    bookings = db.query(Booking).filter(Booking.room == room_uuid).all()
+    bookings = db.query(Booking).filter(Booking.room_id == room_uuid).all()
     return bookings
 
 
