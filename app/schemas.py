@@ -9,7 +9,7 @@ class HotelBase(BaseModel):
     country: str
     city: str
     stars: int = Field(None, ge=1, le=5, description="Number of stars (1-5)")
-    images: Optional[str] = None
+    images: Optional[List[str]] = Field(None, description="List of image URLs")
 
 
 class HotelCreate(HotelBase):
@@ -21,14 +21,22 @@ class HotelUpdate(BaseModel):
     country: Optional[str] = None
     city: Optional[str] = None
     stars: Optional[int] = Field(None, ge=1, le=5, description="Number of stars (1-5)")
-    images: Optional[str] = None
+    images: Optional[List[str]] = Field(None, description="List of image URLs")
+
+
+class HotelUpdateDB(BaseModel):
+    name: Optional[str] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    stars: Optional[int] = Field(None, ge=1, le=5, description="Number of stars (1-5)")
+    images: Optional[str] = Field(None, description="JSON string of image URLs")
 
 
 class RoomBase(BaseModel):
     name: str
     description: Optional[str] = None
     price: float = Field(..., gt=0, description="Price must be greater than 0")
-    images: Optional[str] = None
+    images: Optional[List[str]] = Field(None, description="List of image URLs")
 
 
 class RoomCreate(RoomBase):
@@ -41,8 +49,14 @@ class Room(RoomBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    def model_validate(cls, obj):
+        # Convert images JSON string to list for API response
+        if hasattr(obj, "images_list"):
+            obj.images = obj.images_list
+        return super().model_validate(obj)
 
 
 class Hotel(HotelBase):
@@ -50,8 +64,14 @@ class Hotel(HotelBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    def model_validate(cls, obj):
+        # Convert images JSON string to list for API response
+        if hasattr(obj, "images_list"):
+            obj.images = obj.images_list
+        return super().model_validate(obj)
 
 
 class HotelWithRooms(Hotel):
