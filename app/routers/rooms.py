@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
+import json
 from .. import models, database, schemas
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
@@ -100,16 +101,14 @@ def get_room_with_hotel(room_id: str, db: Session = Depends(database.get_db)):
 
 
 @router.post("/", response_model=schemas.Room)
-def create_room(
-    room_data: schemas.RoomCreateWithHotel, db: Session = Depends(database.get_db)
-):
+def create_room(room_data: dict, db: Session = Depends(database.get_db)):
     """Create a new room"""
     try:
         # Validate that hotel_id is a valid UUID
-        hotel_uuid = UUID(room_data.hotel_id)
-    except ValueError:
+        hotel_uuid = UUID(room_data["hotel_id"])
+    except (KeyError, ValueError):
         raise HTTPException(
-            status_code=400, detail="Invalid hotel ID format. Must be a valid UUID."
+            status_code=400, detail="Invalid or missing hotel_id. Must be a valid UUID."
         )
 
     # Check if hotel exists
@@ -119,23 +118,19 @@ def create_room(
 
     # Convert images list to JSON string for storage
     images_json = None
-    if room_data.images:
-        import json
-
-        images_json = json.dumps(room_data.images)
+    if room_data.get("images"):
+        images_json = json.dumps(room_data["images"])
 
     # Convert amenities list to JSON string for storage
     amenities_json = None
-    if room_data.amenities:
-        import json
-
-        amenities_json = json.dumps(room_data.amenities)
+    if room_data.get("amenities"):
+        amenities_json = json.dumps(room_data["amenities"])
 
     db_room = models.Room(
         hotel_id=hotel_uuid,
-        name=room_data.name,
-        description=room_data.description,
-        price=room_data.price,
+        name=room_data["name"],
+        description=room_data.get("description"),
+        price=room_data["price"],
         images=images_json,
         amenities=amenities_json,
     )
@@ -177,14 +172,10 @@ def update_room(
 
     # Handle images conversion if provided
     if "images" in update_data:
-        import json
-
         update_data["images"] = json.dumps(update_data["images"])
 
     # Handle amenities conversion if provided
     if "amenities" in update_data:
-        import json
-
         update_data["amenities"] = json.dumps(update_data["amenities"])
 
     # Update the room
