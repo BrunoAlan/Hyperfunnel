@@ -45,7 +45,7 @@ class RoomCreate(RoomBase):
     pass
 
 
-class Room(BaseModel):
+class Room(RoomBase):
     id: UUID
     hotel_id: UUID
     created_at: datetime
