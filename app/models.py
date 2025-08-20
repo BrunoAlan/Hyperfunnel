@@ -2,7 +2,9 @@ from sqlalchemy import Column, Float, Integer, String, Text, DateTime, ForeignKe
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+import json
 from .database import Base
+from typing import Optional, List
 
 
 class Hotel(Base):
@@ -20,6 +22,24 @@ class Hotel(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     rooms = relationship("Room", back_populates="hotel", cascade="all, delete-orphan")
 
+    @property
+    def images_list(self) -> Optional[List[str]]:
+        """Convert images JSON string to list"""
+        if self.images:
+            try:
+                return json.loads(self.images)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return None
+
+    @images_list.setter
+    def images_list(self, value: Optional[List[str]]):
+        """Convert images list to JSON string"""
+        if value is not None:
+            self.images = json.dumps(value)
+        else:
+            self.images = None
+
 
 class Room(Base):
     __tablename__ = "rooms"
@@ -35,3 +55,21 @@ class Room(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     hotel = relationship("Hotel", back_populates="rooms")
+
+    @property
+    def images_list(self) -> Optional[List[str]]:
+        """Convert images JSON string to list"""
+        if self.images:
+            try:
+                return json.loads(self.images)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return None
+
+    @images_list.setter
+    def images_list(self, value: Optional[List[str]]):
+        """Convert images list to JSON string"""
+        if value is not None:
+            self.images = json.dumps(value)
+        else:
+            self.images = None
