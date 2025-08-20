@@ -316,8 +316,9 @@ def search_availability(
                 "name": record.room.name,
                 "description": record.room.description,
                 "price": record.room.price,
-                "images": record.room.images_list,  # Use the property that converts JSON to list
-                "amenities": record.room.amenities_list,  # Use the property that converts JSON to list
+                "guest": record.room.guest,
+                "images": getattr(record.room, "images_list", None),
+                "amenities": getattr(record.room, "amenities_list", None),
                 "created_at": record.room.created_at,
                 "updated_at": record.room.updated_at,
             },
