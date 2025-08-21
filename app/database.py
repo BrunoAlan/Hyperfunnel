@@ -1,10 +1,24 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+from dotenv import load_dotenv
+import os
+
+load_dotenv(override=True)
+
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT")
+POSTGRES_DB = os.getenv("POSTGRES_DB")
 
 # PostgreSQL connection string
 SQLALCHEMY_DATABASE_URL = (
     "postgresql://hyperfunnel_user:hyperfunnel_password@localhost:5432/hyperfunnel"
 )
+
+# Build PostgreSQL connection string using environment variables
+SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+
 
 # Create SQLAlchemy engine
 engine = create_engine(
