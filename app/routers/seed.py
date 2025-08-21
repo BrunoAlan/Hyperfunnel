@@ -8,8 +8,206 @@ from ..models import Hotel, Room, Availability, Booking, BookingStatus
 import json
 import os
 import uuid
+import calendar
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/seed", tags=["seed"])
+
+
+class AvailabilityRequest(BaseModel):
+    year: int
+    month: int
+    total_rooms: int = 5
+    available_rooms: int = 5
+    verify: bool = False
+
+
+@router.post("/set-availability", response_model=Dict[str, Any])
+def set_availability_endpoint(
+    request: AvailabilityRequest, db: Session = Depends(database.get_db)
+):
+    """
+    Set availability for all rooms in a specified month and year.
+    This endpoint provides the same functionality as the set_availability.py script.
+    """
+    try:
+        # Validate input parameters
+        if request.available_rooms > request.total_rooms:
+            raise HTTPException(
+                status_code=400,
+                detail="Available rooms cannot be greater than total rooms",
+            )
+
+        if request.available_rooms < 0 or request.total_rooms < 0:
+            raise HTTPException(
+                status_code=400, detail="Room counts cannot be negative"
+            )
+
+        if request.month < 1 or request.month > 12:
+            raise HTTPException(
+                status_code=400, detail="Month must be between 1 and 12"
+            )
+
+        # Get all rooms
+        rooms = db.query(Room).all()
+        if not rooms:
+            raise HTTPException(
+                status_code=404,
+                detail="No rooms found in the database. Please create rooms first.",
+            )
+
+        # Generate dates for the specified month and year
+        _, days_in_month = calendar.monthrange(request.year, request.month)
+        month_dates = []
+        for day in range(1, days_in_month + 1):
+            month_dates.append(date(request.year, request.month, day))
+
+        month_name = calendar.month_name[request.month]
+
+        # Process availability for each room and date
+        total_records = len(rooms) * len(month_dates)
+        created_count = 0
+        updated_count = 0
+
+        for room in rooms:
+            for target_date in month_dates:
+                # Check if availability record already exists
+                existing_availability = (
+                    db.query(Availability)
+                    .filter(
+                        Availability.room_id == room.id,
+                        Availability.date == target_date,
+                    )
+                    .first()
+                )
+
+                if existing_availability:
+                    # Update existing record
+                    existing_availability.total_rooms = request.total_rooms
+                    existing_availability.available_rooms = request.available_rooms
+                    existing_availability.is_blocked = False
+                    updated_count += 1
+                else:
+                    # Create new record
+                    new_availability = Availability(
+                        room_id=room.id,
+                        date=target_date,
+                        total_rooms=request.total_rooms,
+                        available_rooms=request.available_rooms,
+                        is_blocked=False,
+                        price_override=None,
+                    )
+                    db.add(new_availability)
+                    created_count += 1
+
+        # Commit changes
+        db.commit()
+
+        # Prepare response
+        response = {
+            "message": f"Availability configured successfully for {month_name} {request.year}",
+            "summary": {
+                "year": request.year,
+                "month": request.month,
+                "month_name": month_name,
+                "rooms_processed": len(rooms),
+                "dates_configured": len(month_dates),
+                "total_records": total_records,
+                "new_records_created": created_count,
+                "records_updated": updated_count,
+                "available_rooms_per_day": request.available_rooms,
+                "total_rooms_per_type": request.total_rooms,
+                "period": f"All of {month_name} {request.year}",
+                "status": "All rooms available",
+                "no_blocks": True,
+                "special_prices": "Existing ones maintained",
+            },
+        }
+
+        # Add verification if requested
+        if request.verify:
+            verification = verify_availability_internal(request.year, request.month, db)
+            response["verification"] = verification
+
+        return response
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Error setting availability: {str(e)}"
+        )
+
+
+def verify_availability_internal(year: int, month: int, db: Session) -> Dict[str, Any]:
+    """
+    Internal function to verify availability configuration.
+    """
+    try:
+        month_name = calendar.month_name[month]
+
+        # Count availability records for the specified month and year
+        month_check_in = date(year, month, 1)
+        _, days_in_month = calendar.monthrange(year, month)
+        month_check_out = date(year, month, days_in_month)
+
+        availability_count = (
+            db.query(Availability)
+            .filter(
+                Availability.date >= month_check_in,
+                Availability.date <= month_check_out,
+            )
+            .count()
+        )
+
+        room_count = db.query(Room).count()
+        expected_records = room_count * days_in_month
+
+        # Check for blocked dates
+        blocked_count = (
+            db.query(Availability)
+            .filter(
+                Availability.date >= month_check_in,
+                Availability.date <= month_check_out,
+                Availability.is_blocked == True,
+            )
+            .count()
+        )
+
+        # Check for dates without availability
+        unavailable_count = (
+            db.query(Availability)
+            .filter(
+                Availability.date >= month_check_in,
+                Availability.date <= month_check_out,
+                Availability.available_rooms == 0,
+            )
+            .count()
+        )
+
+        return {
+            "verification_statistics": {
+                f"availability_records_in_{month_name}_{year}": availability_count,
+                "expected_records": expected_records,
+                "status": (
+                    "Correct"
+                    if availability_count == expected_records
+                    else "Incomplete"
+                ),
+                "blocked_dates": blocked_count,
+                "dates_without_availability": unavailable_count,
+            },
+            "verification_summary": {
+                "records_correct": availability_count == expected_records,
+                "no_blocked_dates": blocked_count == 0,
+                "all_dates_available": unavailable_count == 0,
+            },
+        }
+
+    except Exception as e:
+        return {"error": f"Verification failed: {str(e)}"}
 
 
 @router.get("/export", response_model=Dict[str, Any])
