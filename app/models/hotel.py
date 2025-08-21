@@ -17,7 +17,7 @@ class Hotel(Base):
     __tablename__ = "hotels"
 
     id = Column(
-        UUID(as_uuid=True), primary_key=True, server_default=func.uuid_generate_v4()
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
     )
     name = Column(String(200), nullable=False)
     country = Column(String(100), nullable=False)

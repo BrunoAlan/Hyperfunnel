@@ -418,6 +418,8 @@ dependencies = [
     { name = "alembic", version = "1.16.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "fastapi" },
     { name = "psycopg2-binary" },
+    { name = "python-dotenv", version = "1.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "python-dotenv", version = "1.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "sqlalchemy" },
     { name = "uvicorn", version = "0.33.0", source = { registry = "https://pypi.org/simple" }, extra = ["standard"], marker = "python_full_version < '3.9'" },
     { name = "uvicorn", version = "0.35.0", source = { registry = "https://pypi.org/simple" }, extra = ["standard"], marker = "python_full_version >= '3.9'" },
@@ -437,6 +439,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.14.1" },
     { name = "fastapi", specifier = ">=0.104.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.43" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24.0" },
 ]

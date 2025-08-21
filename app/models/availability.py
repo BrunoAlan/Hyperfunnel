@@ -17,7 +17,7 @@ class Availability(Base):
     __tablename__ = "availability"
 
     id = Column(
-        UUID(as_uuid=True), primary_key=True, server_default=func.uuid_generate_v4()
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
     )
     room_id = Column(UUID(as_uuid=True), ForeignKey("rooms.id"), nullable=False)
     date = Column(Date, nullable=False)

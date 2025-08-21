@@ -1,18 +1,26 @@
 """
-Script to make all rooms available during the entire month of September 2025.
+Script to make all rooms available during a specified month and year.
 
 This script:
 1. Gets all existing rooms from the database
-2. Generates availability records for each day of September 2025
+2. Generates availability records for each day of the specified month and year
 3. Sets total availability for each room type
 4. Handles existing records by updating or creating new ones as needed
 
 Usage:
-    python set_availability.py
+    python set_availability.py --year 2025 --month 9 --total-rooms 5 --available-rooms 5
+    python set_availability.py -y 2025 -m 9 -t 5 -a 5
+    
+    Default values:
+    - year: current year
+    - month: current month
+    - total-rooms: 5
+    - available-rooms: 5
 """
 
 import asyncio
-from datetime import date, timedelta
+import argparse
+from datetime import date, timedelta, datetime
 from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -20,11 +28,60 @@ from app.database import SessionLocal, engine
 from app.models import Room, Availability
 import calendar
 
-# Configuration for September 2025
-YEAR = 2025
-MONTH = 9  # September
+# Default configuration values
 DEFAULT_TOTAL_ROOMS = 5
 DEFAULT_AVAILABLE_ROOMS = 5
+
+
+def parse_arguments():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description="Set availability for rooms in a specified month and year"
+    )
+
+    # Get current year and month as defaults
+    current_date = datetime.now()
+
+    parser.add_argument(
+        "--year",
+        "-y",
+        type=int,
+        default=current_date.year,
+        help=f"Year to set availability for (default: {current_date.year})",
+    )
+
+    parser.add_argument(
+        "--month",
+        "-m",
+        type=int,
+        default=current_date.month,
+        choices=range(1, 13),
+        help=f"Month to set availability for, 1-12 (default: {current_date.month})",
+    )
+
+    parser.add_argument(
+        "--total-rooms",
+        "-t",
+        type=int,
+        default=DEFAULT_TOTAL_ROOMS,
+        help=f"Total number of rooms available per day (default: {DEFAULT_TOTAL_ROOMS})",
+    )
+
+    parser.add_argument(
+        "--available-rooms",
+        "-a",
+        type=int,
+        default=DEFAULT_AVAILABLE_ROOMS,
+        help=f"Number of available rooms per day (default: {DEFAULT_AVAILABLE_ROOMS})",
+    )
+
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="Verify the configuration after setting availability",
+    )
+
+    return parser.parse_args()
 
 
 def get_db() -> Session:
@@ -32,9 +89,9 @@ def get_db() -> Session:
     return SessionLocal()
 
 
-def get_september_dates(year: int, month: int) -> List[date]:
-    """Generate all dates for the month of September 2025"""
-    # Get the number of days in September for the given year
+def get_month_dates(year: int, month: int) -> List[date]:
+    """Generate all dates for the specified month and year"""
+    # Get the number of days in the specified month for the given year
     _, days_in_month = calendar.monthrange(year, month)
 
     dates = []
@@ -92,12 +149,15 @@ def create_or_update_availability(
         return True
 
 
-def set_september_availability():
-    """Main function to configure September 2025 availability"""
+def set_month_availability(
+    year: int, month: int, total_rooms: int, available_rooms: int
+):
+    """Main function to configure availability for the specified month and year"""
     db = get_db()
 
     try:
-        print("🏨 Setting up availability for September 2025")
+        month_name = calendar.month_name[month]
+        print(f"🏨 Setting up availability for {month_name} {year}")
         print("=" * 60)
 
         # 1. Get all rooms
@@ -113,15 +173,15 @@ def set_september_availability():
         for room in rooms:
             print(f"   - {room.name} (ID: {room.id}) - €{room.price}/night")
 
-        # 2. Generate September 2025 dates
-        print(f"\n📅 Generating dates for September {YEAR}...")
-        september_dates = get_september_dates(YEAR, MONTH)
-        print(f"✅ Generated {len(september_dates)} dates:")
-        print(f"   From {september_dates[0]} to {september_dates[-1]}")
+        # 2. Generate dates for the specified month and year
+        print(f"\n📅 Generating dates for {month_name} {year}...")
+        month_dates = get_month_dates(year, month)
+        print(f"✅ Generated {len(month_dates)} dates:")
+        print(f"   From {month_dates[0]} to {month_dates[-1]}")
 
         # 3. Configure availability for each room and date
         print(f"\n🔧 Setting up availability...")
-        total_records = len(rooms) * len(september_dates)
+        total_records = len(rooms) * len(month_dates)
         created_count = 0
         updated_count = 0
 
@@ -130,13 +190,13 @@ def set_september_availability():
             room_created = 0
             room_updated = 0
 
-            for target_date in september_dates:
+            for target_date in month_dates:
                 is_new = create_or_update_availability(
                     db=db,
                     room_id=room.id,
                     target_date=target_date,
-                    total_rooms=DEFAULT_TOTAL_ROOMS,
-                    available_rooms=DEFAULT_AVAILABLE_ROOMS,
+                    total_rooms=total_rooms,
+                    available_rooms=available_rooms,
                     is_blocked=False,
                 )
 
@@ -157,15 +217,15 @@ def set_september_availability():
         print(f"\n✅ Availability configured successfully!")
         print(f"📊 Summary:")
         print(f"   • Rooms processed: {len(rooms)}")
-        print(f"   • Dates configured: {len(september_dates)} days")
+        print(f"   • Dates configured: {len(month_dates)} days")
         print(f"   • Total records: {total_records}")
         print(f"   • New records created: {created_count}")
         print(f"   • Records updated: {updated_count}")
-        print(f"   • Available rooms per day: {DEFAULT_AVAILABLE_ROOMS}")
-        print(f"   • Total rooms per type: {DEFAULT_TOTAL_ROOMS}")
+        print(f"   • Available rooms per day: {available_rooms}")
+        print(f"   • Total rooms per type: {total_rooms}")
 
         print(f"\n🎯 Configuration applied:")
-        print(f"   • Period: All of September {YEAR}")
+        print(f"   • Period: All of {month_name} {year}")
         print(f"   • Status: All rooms available")
         print(f"   • No blocks: ✓")
         print(f"   • Special prices: Existing ones maintained")
@@ -178,31 +238,33 @@ def set_september_availability():
         db.close()
 
 
-def verify_availability():
+def verify_availability(year: int, month: int):
     """Function to verify that availability was configured correctly"""
     db = get_db()
 
     try:
-        print(f"\n🔍 Verifying configuration...")
+        month_name = calendar.month_name[month]
+        print(f"\n🔍 Verifying configuration for {month_name} {year}...")
 
-        # Count availability records for September 2025
-        september_check_in = date(YEAR, MONTH, 1)
-        september_check_out = date(YEAR, MONTH, 30)
+        # Count availability records for the specified month and year
+        month_check_in = date(year, month, 1)
+        _, days_in_month = calendar.monthrange(year, month)
+        month_check_out = date(year, month, days_in_month)
 
         availability_count = (
             db.query(Availability)
             .filter(
-                Availability.date >= september_check_in,
-                Availability.date <= september_check_out,
+                Availability.date >= month_check_in,
+                Availability.date <= month_check_out,
             )
             .count()
         )
 
         room_count = db.query(Room).count()
-        expected_records = room_count * 30  # 30 days in September
+        expected_records = room_count * days_in_month
 
         print(f"📈 Verification statistics:")
-        print(f"   • Availability records in September: {availability_count}")
+        print(f"   • Availability records in {month_name} {year}: {availability_count}")
         print(f"   • Expected records: {expected_records}")
         print(
             f"   • Status: {'✅ Correct' if availability_count == expected_records else '❌ Incomplete'}"
@@ -212,8 +274,8 @@ def verify_availability():
         blocked_count = (
             db.query(Availability)
             .filter(
-                Availability.date >= september_check_in,
-                Availability.date <= september_check_out,
+                Availability.date >= month_check_in,
+                Availability.date <= month_check_out,
                 Availability.is_blocked == True,
             )
             .count()
@@ -227,8 +289,8 @@ def verify_availability():
         unavailable_count = (
             db.query(Availability)
             .filter(
-                Availability.date >= september_check_in,
-                Availability.date <= september_check_out,
+                Availability.date >= month_check_in,
+                Availability.date <= month_check_out,
                 Availability.available_rooms == 0,
             )
             .count()
@@ -244,11 +306,29 @@ def verify_availability():
 
 if __name__ == "__main__":
     try:
-        # Execute main configuration
-        set_september_availability()
+        # Parse command line arguments
+        args = parse_arguments()
 
-        # Verify everything is correct
-        verify_availability()
+        # Validate arguments
+        if args.available_rooms > args.total_rooms:
+            print("❌ Error: Available rooms cannot be greater than total rooms")
+            exit(1)
+
+        if args.available_rooms < 0 or args.total_rooms < 0:
+            print("❌ Error: Room counts cannot be negative")
+            exit(1)
+
+        # Execute main configuration
+        set_month_availability(
+            year=args.year,
+            month=args.month,
+            total_rooms=args.total_rooms,
+            available_rooms=args.available_rooms,
+        )
+
+        # Verify everything is correct if requested
+        if args.verify:
+            verify_availability(year=args.year, month=args.month)
 
         print(f"\n🎉 Script completed successfully!")
         print(f"\n📝 Suggested next steps:")
