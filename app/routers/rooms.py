@@ -211,3 +211,45 @@ def update_room(
         db_room.amenities = db_room.amenities_list
 
     return db_room
+
+
+@router.delete("/{room_id}")
+def delete_room(room_id: str, db: Session = Depends(database.get_db)):
+    """Delete a room"""
+    try:
+        # Validate that room_id is a valid UUID
+        room_uuid = UUID(room_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid room ID format. Must be a valid UUID."
+        )
+
+    # Check if room exists
+    db_room = db.query(Room).filter(Room.id == room_uuid).first()
+    if db_room is None:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    # Check if room has any active bookings
+    from ..models import Booking
+    from ..models.booking import BookingStatus
+
+    active_bookings = (
+        db.query(Booking)
+        .filter(
+            Booking.room_id == room_uuid,
+            Booking.status.in_([BookingStatus.PENDING, BookingStatus.CONFIRMED]),
+        )
+        .first()
+    )
+
+    if active_bookings:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete room with active bookings. Please cancel or complete all bookings first.",
+        )
+
+    # Delete the room (availability will be automatically deleted due to cascade)
+    db.delete(db_room)
+    db.commit()
+
+    return {"message": "Room deleted successfully"}
