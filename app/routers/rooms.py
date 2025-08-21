@@ -8,6 +8,7 @@ from ..models import Room, Hotel
 from ..schemas import (
     Room as RoomSchema,
     RoomCreate,
+    RoomCreateWithHotel,
     RoomUpdate,
     Hotel as HotelSchema,
 )
@@ -118,11 +119,11 @@ def get_room_with_hotel(room_id: str, db: Session = Depends(database.get_db)):
 
 
 @router.post("", response_model=RoomSchema)
-def create_room(room_data: dict, db: Session = Depends(database.get_db)):
+def create_room(room_data: RoomCreateWithHotel, db: Session = Depends(database.get_db)):
     """Create a new room"""
     try:
         # Validate that hotel_id is a valid UUID
-        hotel_uuid = UUID(room_data["hotel_id"])
+        hotel_uuid = room_data.hotel_id
     except (KeyError, ValueError):
         raise HTTPException(
             status_code=400, detail="Invalid or missing hotel_id. Must be a valid UUID."
@@ -135,20 +136,20 @@ def create_room(room_data: dict, db: Session = Depends(database.get_db)):
 
     # Convert images list to JSON string for storage
     images_json = None
-    if room_data.get("images"):
-        images_json = json.dumps(room_data["images"])
+    if room_data.images:
+        images_json = json.dumps(room_data.images)
 
     # Convert amenities list to JSON string for storage
     amenities_json = None
-    if room_data.get("amenities"):
-        amenities_json = json.dumps(room_data["amenities"])
+    if room_data.amenities:
+        amenities_json = json.dumps(room_data.amenities)
 
     db_room = Room(
         hotel_id=hotel_uuid,
-        name=room_data["name"],
-        description=room_data.get("description"),
-        price=room_data["price"],
-        guest=room_data["guest"],
+        name=room_data.name,
+        description=room_data.description,
+        price=room_data.price,
+        guest=room_data.guest,
         images=images_json,
         amenities=amenities_json,
     )
