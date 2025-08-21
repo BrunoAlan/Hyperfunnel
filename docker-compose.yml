@@ -18,6 +18,25 @@ services:
     networks:
       - hyperfunnel-network
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: hyperfunnel-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_DB: hyperfunnel
+      POSTGRES_USER: hyperfunnel_user
+      POSTGRES_PASSWORD: hyperfunnel_password
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+    depends_on:
+      - postgres
+    networks:
+      - hyperfunnel-network
+
 volumes:
   postgres_data:
     driver: local

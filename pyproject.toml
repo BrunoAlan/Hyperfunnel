@@ -9,6 +9,7 @@ dependencies = [
     "psycopg2-binary>=2.9.0",
     "uvicorn[standard]>=0.24.0",
     "alembic>=1.14.1",
+    "python-dotenv>=1.0.0",
 ]
 
 [build-system]
