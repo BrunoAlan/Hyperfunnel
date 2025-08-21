@@ -17,8 +17,8 @@ app.include_router(hotels.router)
 app.include_router(rooms.router)
 app.include_router(availability.router)
 app.include_router(bookings.router)
-app.include_router(seed.router)
 app.include_router(destinations.router)
+app.include_router(seed.router)
 
 
 @app.get("/")
