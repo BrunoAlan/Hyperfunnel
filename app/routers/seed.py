@@ -4,7 +4,7 @@ from sqlalchemy import delete
 from typing import Dict, Any
 from datetime import datetime, date
 from .. import database
-from ..models import Hotel, Room, Availability, Booking
+from ..models import Hotel, Room, Availability, Booking, BookingStatus
 import json
 import os
 import uuid
@@ -77,6 +77,28 @@ def export_current_data(db: Session = Depends(database.get_db)):
             }
             availability_data.append(avail_dict)
 
+        # Get all bookings
+        bookings = db.query(Booking).all()
+        bookings_data = []
+        for booking in bookings:
+            booking_dict = {
+                "booking_id": str(booking.booking_id),
+                "hotel_id": str(booking.hotel_id),
+                "room_id": str(booking.room_id),
+                "check_in_date": booking.check_in_date.isoformat(),
+                "check_out_date": booking.check_out_date.isoformat(),
+                "guests": booking.guests,
+                "price": booking.price,
+                "status": booking.status.value,
+                "created_at": (
+                    booking.created_at.isoformat() if booking.created_at else None
+                ),
+                "updated_at": (
+                    booking.updated_at.isoformat() if booking.updated_at else None
+                ),
+            }
+            bookings_data.append(booking_dict)
+
         # Generate filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"hyperfunnel_seed_{timestamp}.json"
@@ -88,11 +110,13 @@ def export_current_data(db: Session = Depends(database.get_db)):
                 "total_hotels": len(hotels_data),
                 "total_rooms": len(rooms_data),
                 "total_availability_records": len(availability_data),
+                "total_bookings": len(bookings_data),
                 "file_created": filename,
             },
             "hotels": hotels_data,
             "rooms": rooms_data,
             "availability": availability_data,
+            "bookings": bookings_data,
         }
 
         # Save to JSON file
@@ -147,7 +171,7 @@ def import_seed_data(filename: str, db: Session = Depends(database.get_db)):
             )
 
         # Validate seed file structure
-        required_keys = ["hotels", "rooms", "availability"]
+        required_keys = ["hotels", "rooms", "availability", "bookings"]
         for key in required_keys:
             if key not in seed_data:
                 raise HTTPException(
@@ -250,6 +274,35 @@ def import_seed_data(filename: str, db: Session = Depends(database.get_db)):
                 db.add(availability)
                 availability_imported += 1
 
+            # Flush availability before adding bookings
+            db.flush()
+
+            # Import bookings
+            bookings_imported = 0
+            for booking_data in seed_data["bookings"]:
+                booking = Booking(
+                    booking_id=uuid.UUID(booking_data["booking_id"]),
+                    hotel_id=uuid.UUID(booking_data["hotel_id"]),
+                    room_id=uuid.UUID(booking_data["room_id"]),
+                    check_in_date=date.fromisoformat(booking_data["check_in_date"]),
+                    check_out_date=date.fromisoformat(booking_data["check_out_date"]),
+                    guests=booking_data["guests"],
+                    price=booking_data["price"],
+                    status=BookingStatus(booking_data["status"]),
+                    created_at=(
+                        datetime.fromisoformat(booking_data["created_at"])
+                        if booking_data["created_at"]
+                        else None
+                    ),
+                    updated_at=(
+                        datetime.fromisoformat(booking_data["updated_at"])
+                        if booking_data["updated_at"]
+                        else None
+                    ),
+                )
+                db.add(booking)
+                bookings_imported += 1
+
             # Commit all changes
             db.commit()
 
@@ -260,6 +313,7 @@ def import_seed_data(filename: str, db: Session = Depends(database.get_db)):
                     "hotels_imported": hotels_imported,
                     "rooms_imported": rooms_imported,
                     "availability_records_imported": availability_imported,
+                    "bookings_imported": bookings_imported,
                     "imported_at": datetime.now().isoformat(),
                 },
             }
