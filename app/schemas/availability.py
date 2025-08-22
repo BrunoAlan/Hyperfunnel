@@ -79,5 +79,5 @@ class AvailabilitySearch(BaseModel):
         default=1, ge=1, description="Minimum number of rooms needed"
     )
     guests: int = Field(
-        default=1, ge=1, description="Number of guests that need to be accommodated"
+        ge=1, description="Number of guests that need to be accommodated"
     )
